@@ -73,6 +73,7 @@
   .chip:hover{color:var(--text);border-color:var(--dim)}
   .chip.on{color:#fff;background:color-mix(in srgb,var(--ai) 20%,transparent);border-color:var(--ai)}
   .chip .d{font-size:10.5px;color:var(--dim)} .chip.on .d{color:#cdbcf0}
+  .chip.fast.on{background:color-mix(in srgb,var(--amber) 20%,transparent);border-color:var(--amber);color:#fff}
   .inputrow{display:flex;gap:10px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);
             border-radius:var(--r);padding:8px 8px 8px 14px;transition:border-color .15s}
   .inputrow:focus-within{border-color:color-mix(in srgb,var(--ai) 55%,transparent)}
@@ -139,6 +140,7 @@
             <div class="chip" data-mode="brief">Brief <span class="d">what now</span></div>
             <div class="chip" data-mode="plan">Plan <span class="d">goal → tasks</span></div>
             <div class="chip" data-mode="coach">Coach <span class="d">why I stall</span></div>
+            <div class="chip fast" id="fastBtn" title="One model call per turn — saves free-tier quota (brief / coach)" style="margin-left:auto">⚡ Fast</div>
           </div>
           <div class="inputrow">
             <textarea id="msg" rows="1" placeholder="Ask Nova anything…" aria-label="Message Nova"></textarea>
@@ -169,7 +171,7 @@
 
 <script>
 const $=id=>document.getElementById(id);
-let MODE="ask", busy=false;
+let MODE="ask", busy=false, FAST=false;
 
 /* ---------- helpers ---------- */
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -213,11 +215,12 @@ const PH={ask:"Ask Nova anything — it routes to the right agent…",
           brief:"Press send for your briefing, or add context…",
           plan:"Describe a goal, e.g. “prepare for the Microsoft interview”…",
           coach:"Press send, or ask about a specific habit…"};
-document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{
+document.querySelectorAll(".chip[data-mode]").forEach(c=>c.addEventListener("click",()=>{
   MODE=c.dataset.mode;
-  document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c));
+  document.querySelectorAll(".chip[data-mode]").forEach(x=>x.classList.toggle("on",x===c));
   $("msg").placeholder=PH[MODE]; $("msg").focus();
 }));
+$("fastBtn").addEventListener("click",()=>{ FAST=!FAST; $("fastBtn").classList.toggle("on",FAST); $("msg").focus(); });
 
 /* ---------- send ---------- */
 async function send(){
@@ -232,7 +235,7 @@ async function send(){
   addThinking();
   try{
     const r=await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},
-                        body:JSON.stringify({mode:MODE,message:text})});
+                        body:JSON.stringify({mode:MODE,message:text,fast:FAST})});
     const d=await r.json();
     $("thinking")?.remove();
     if(!r.ok){ addNova(d.message||"Something went wrong.",null,true); }

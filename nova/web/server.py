@@ -31,6 +31,7 @@ _STATIC = Path(__file__).resolve().parent / "static"
 class AgentRequest(BaseModel):
     mode: str = "ask"  # ask | brief | plan | coach
     message: str = ""
+    fast: bool = False  # quota-frugal one-call path (brief/coach only)
 
 
 def _capture(agent, message: str) -> tuple[str, list[str]]:
@@ -109,6 +110,18 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             )
         mode = (req.mode or "ask").lower()
         msg = (req.message or "").strip()
+
+        # Quota-frugal path: one model call, no tool round-trips (brief/coach only).
+        if req.fast and mode in ("brief", "coach"):
+            from ..agents.fast_coach import run_fast
+            try:
+                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg)
+            except Exception as e:
+                return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
+            if not text:
+                text = ("I couldn't finish that turn — usually the Gemini free-tier daily limit "
+                        "(resets every 24h). You can also set NOVA_GEMINI_MODEL in .env.")
+            return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode, "fast": True})
 
         from ..agents.briefing_agent import build_briefing_agent
         from ..agents.coach_agent import build_coach_agent

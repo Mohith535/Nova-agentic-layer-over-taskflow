@@ -64,6 +64,8 @@ def main(argv=None) -> None:
     p_mcp.add_argument("--selftest", action="store_true", help="List MCP tools and exit.")
     p_web = sub.add_parser("web", help="Launch the Nova web console (localhost).")
     p_web.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--fast", action="store_true",
+                        help="Quota-frugal: one model call per turn (applies to brief/coach).")
 
     args = parser.parse_args(argv)
 
@@ -105,6 +107,22 @@ def main(argv=None) -> None:
     tools = None if use_mcp else NovaTools(dd)  # in-process tools (skipped in MCP mode)
     if use_mcp:
         print("(routing through the live MCP server subprocess…)", file=sys.stderr)
+
+    # Quota-frugal path: one model call, no tool round-trips (brief/coach only).
+    if args.fast and args.cmd in ("brief", "coach"):
+        from .agents.fast_coach import run_fast
+
+        fmsg = " ".join(getattr(args, "question", []) or []) if args.cmd == "coach" else ""
+        try:
+            out, _ = run_fast(NovaTools(dd), args.cmd, fmsg)
+        except Exception as e:
+            m = str(e)
+            if "RESOURCE_EXHAUSTED" in m or "429" in m:
+                m = "Gemini's free-tier daily limit was reached (resets in 24h). Try later, or set NOVA_GEMINI_MODEL."
+            print(f"Nova: {m}", file=sys.stderr)
+            sys.exit(1)
+        print(out or "(no response)")
+        return
 
     if args.cmd == "brief":
         from .agents.briefing_agent import build_briefing_agent
