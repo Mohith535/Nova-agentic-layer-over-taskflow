@@ -62,6 +62,8 @@ def main(argv=None) -> None:
     p_ask.add_argument("message", nargs="+")
     p_mcp = sub.add_parser("mcp", help="Run or inspect the MCP server.")
     p_mcp.add_argument("--selftest", action="store_true", help="List MCP tools and exit.")
+    p_web = sub.add_parser("web", help="Launch the Nova web console (localhost).")
+    p_web.add_argument("--port", type=int, default=8765)
 
     args = parser.parse_args(argv)
 
@@ -73,6 +75,12 @@ def main(argv=None) -> None:
         from .mcp.server import main as mcp_main
 
         mcp_main(["--selftest"] if args.selftest else [])
+        return
+
+    if args.cmd == "web":
+        from .web.server import serve
+
+        serve(port=args.port)  # localhost console; needs a key only when you run an agent
         return
 
     # Agent commands need a model key.

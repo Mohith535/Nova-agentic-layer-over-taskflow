@@ -17,6 +17,8 @@ dependencies = [
     "google-adk>=0.2.0",
     "google-generativeai>=0.8.0",
     "python-dotenv>=1.0.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -28,3 +30,6 @@ nova = "nova.main:main"
 
 [tool.setuptools.packages.find]
 include = ["nova*"]
+
+[tool.setuptools.package-data]
+nova = ["web/static/*.html"]

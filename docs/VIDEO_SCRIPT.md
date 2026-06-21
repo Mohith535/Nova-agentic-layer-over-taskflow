@@ -29,13 +29,17 @@ again."* This is the emotional core — let it breathe for 2 seconds.
 On screen: the architecture diagram from the README. Highlight the read-only vs. write split.
 
 ### 1:50–3:10 · THE DEMO (this is what wins — give it the most time)
-Terminal in Antigravity. Run, in order:
-1. `nova coach` → let the full response render. **Pause on the line where it quotes the user's own
-   deadline reason.** VO: *"It didn't invent that — it read my own words back to me."*
-2. `nova plan "prepare for the Microsoft Explore interview"` → show the 5 created tasks + the
-   Prime Target suggestion. VO: *"It respected my current load and sized the work up, not down."*
-3. `nova brief` → the evening wind-down line. VO: *"After 6pm it stops piling on and helps me pick
-   one thing for tomorrow."*
+Open the **web console** (`nova web` → http://127.0.0.1:8765) in the browser. Lead with the
+**grounding strip** — VO: *"Before it says anything, Nova shows what it's reading: my completion
+rate, the tags I postpone most, my overdue backlog. Real data."*
+1. Click **Coach** → Send. As the response renders, point at the **"Nova used:" tool chips**
+   (get_behavioral_stats, get_edit_history) — VO: *"You can see the tools it called."* Then pause
+   on the line where it **quotes my own deadline reason**: *"It didn't invent that — it read my own
+   words back to me."* (This is the emotional peak — let it sit.)
+2. **Plan** → type *"prepare for the Microsoft Explore interview"* → Send. Show the 5 tasks +
+   Prime-Target suggestion. VO: *"It respected my current load and sized the work up, not down."*
+3. **Brief** → Send. The evening wind-down line. VO: *"After 6pm it stops piling on and helps me
+   pick one thing for tomorrow."*
 
 ### 3:10–3:50 · MCP is real (not a checkbox)
 1. `python -m nova.mcp.server --selftest` → the 8 tools.

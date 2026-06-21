@@ -132,12 +132,22 @@ python -m venv .venv && .venv\Scripts\activate      # Windows  (source .venv/bin
 pip install -e .                                     # + pip install -e <taskflow> to read real data
 copy .env.example .env                               # then add your free Gemini key
 
+nova web                     # ← the visual console at http://127.0.0.1:8765 (recommended)
 nova mcp --selftest          # works with no key — lists the 8 MCP tools
 nova brief                   # today's mission briefing from your data
 nova plan "prepare for the Microsoft Explore interview"
 nova coach                   # behavioral patterns + one concrete change
 nova ask "what should I focus on this morning?"      # router picks the agent
 ```
+
+### The console (`nova web`)
+
+A small localhost web console that makes the agents *visible*. It wears TaskFlow's dark
+Mission-Control look, shows a live **grounding strip** of the behavioral signal Nova is reading
+(completion rate, postpone patterns, overdue backlog), pick-a-mode chips (Brief / Plan / Coach /
+Ask), and — the part that matters — it shows **which tools each agent actually called** above the
+answer. That turns "looks like a chatbot" into "obviously an agent reasoning over real data."
+Binds to `127.0.0.1` only; no new data path (same `NovaTools` as the CLI and MCP server).
 
 A free Gemini key (1500 req/day): <https://aistudio.google.com/apikey>.
 

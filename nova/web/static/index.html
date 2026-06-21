@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nova — the brain of TaskFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D1117; --surface:#161B22; --surface2:#1C2230; --border:#21262D;
+    --text:#E6EDF3; --muted:#8B949E; --dim:#6E7681;
+    --blue:#58A6FF; --ai:#A371F7; --green:#3FB950; --amber:#D29922; --red:#F85149;
+    --mono:'DM Mono',ui-monospace,monospace; --sans:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 70% -10%, #15203a 0%, var(--bg) 55%);
+       color:var(--text);font-family:var(--sans);min-height:100vh;line-height:1.55;
+       -webkit-font-smoothing:antialiased;padding:32px 20px 60px}
+  .wrap{max-width:880px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .mark{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+        background:linear-gradient(135deg,#2a2150,#3a2d6b);border:1px solid color-mix(in srgb,var(--ai) 40%,transparent);
+        box-shadow:0 0 30px color-mix(in srgb,var(--ai) 25%,transparent);font-size:20px;color:#d6c2ff}
+  h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13px}
+  .tag{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--border);
+       padding:5px 10px;border-radius:20px}
+  /* grounding strip */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:22px 0}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .stat .k{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+  .stat .v{font-family:var(--mono);font-size:22px;margin-top:6px;font-weight:500}
+  .stat .s{font-size:11px;color:var(--muted);margin-top:2px}
+  .v.blue{color:var(--blue)} .v.ai{color:var(--ai)} .v.amber{color:var(--amber)} .v.green{color:var(--green)}
+  /* console */
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-top:8px}
+  .modes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{font-size:13px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);
+        border-radius:20px;padding:7px 16px;cursor:pointer;transition:all .15s;font-weight:500}
+  .chip:hover{color:var(--text)}
+  .chip.on{color:#fff;background:color-mix(in srgb,var(--ai) 22%,transparent);border-color:var(--ai)}
+  .chip .h{display:block;font-size:10px;color:var(--dim);font-weight:400;margin-top:1px}
+  .chip.on .h{color:#cdbcf0}
+  .inrow{display:flex;gap:10px;align-items:flex-end}
+  textarea{flex:1;background:#0e131b;border:1px solid var(--border);border-radius:10px;color:var(--text);
+           font-family:var(--sans);font-size:14px;padding:12px 14px;resize:none;min-height:46px;max-height:140px}
+  textarea:focus{outline:none;border-color:color-mix(in srgb,var(--ai) 60%,transparent)}
+  .send{background:linear-gradient(135deg,var(--ai),#7c4ddb);border:none;color:#fff;font-weight:600;font-size:14px;
+        border-radius:10px;padding:0 20px;height:46px;cursor:pointer;white-space:nowrap}
+  .send:disabled{opacity:.5;cursor:default}
+  /* response */
+  .out{margin-top:18px;display:none}
+  .out.show{display:block;animation:rise .35s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .trace{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:11px;color:var(--dim)}
+  .tchip{font-family:var(--mono);font-size:11px;color:var(--blue);background:color-mix(in srgb,var(--blue) 9%,transparent);
+         border:1px solid color-mix(in srgb,var(--blue) 22%,transparent);border-radius:6px;padding:2px 8px}
+  .card{background:linear-gradient(180deg,#171d28,#141922);border:1px solid var(--border);
+        border-left:3px solid var(--ai);border-radius:12px;padding:18px 20px;white-space:pre-wrap;font-size:15px;line-height:1.7}
+  .err{border-left-color:var(--red);color:#ffb3ae}
+  .think{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:9px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ai);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+  .foot{margin-top:26px;text-align:center;color:var(--dim);font-size:11px}
+  @media(max-width:640px){.strip{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="mark">✦</div>
+    <div>
+      <h1>Nova</h1>
+      <div class="sub">the brain of TaskFlow — coaching grounded in your real behavior</div>
+    </div>
+    <div class="tag" id="evtag">●&nbsp;local</div>
+  </div>
+
+  <!-- GROUNDING STRIP: what Nova is actually looking at -->
+  <div class="strip" id="strip">
+    <div class="stat"><div class="k">Completion</div><div class="v blue" id="s-comp">—</div><div class="s">of all tasks</div></div>
+    <div class="stat"><div class="k">Avg postpone</div><div class="v amber" id="s-post">—</div><div class="s">per task</div></div>
+    <div class="stat"><div class="k">Most postponed</div><div class="v ai" id="s-tag">—</div><div class="s" id="s-tagn">tag</div></div>
+    <div class="stat"><div class="k">Overdue</div><div class="v" id="s-over">—</div><div class="s">active backlog</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="modes" id="modes">
+      <div class="chip" data-mode="brief">Brief<span class="h">what now?</span></div>
+      <div class="chip" data-mode="plan">Plan<span class="h">goal → tasks</span></div>
+      <div class="chip" data-mode="coach">Coach<span class="h">why I stall</span></div>
+      <div class="chip on" data-mode="ask">Ask<span class="h">route it</span></div>
+    </div>
+    <div class="inrow">
+      <textarea id="msg" placeholder="Ask Nova anything — or pick a mode above…"></textarea>
+      <button class="send" id="send">Send</button>
+    </div>
+    <div class="out" id="out"></div>
+  </div>
+
+  <div class="foot">Your task data stays on your machine · agents reason over it locally · <span style="color:var(--ai)">Nova</span> + TaskFlow v9.1.0</div>
+</div>
+
+<script>
+let MODE = "ask";
+const $ = id => document.getElementById(id);
+
+function pct(x){ return Math.round((x||0)*100) + "%"; }
+
+async function loadContext(){
+  try{
+    const r = await fetch("/api/context"); const d = await r.json();
+    const st = d.stats||{}, cx = d.context||{};
+    $("s-comp").textContent = pct(st.completion_rate);
+    $("s-post").textContent = (st.avg_postpone_count ?? 0).toFixed(1);
+    const top = (st.most_postponed||[])[0];
+    $("s-tag").textContent = top ? ("#"+top.key) : "—";
+    $("s-tagn").textContent = top ? (top.avg_postpone.toFixed(1)+"× on avg") : "none yet";
+    const ov = cx.overdue_total||0;
+    $("s-over").textContent = ov;
+    $("s-over").className = "v " + (ov>0 ? "red" : "green");
+    if(cx.is_evening){ $("evtag").innerHTML = "🌙&nbsp;evening"; }
+  }catch(e){ /* page still works without context */ }
+}
+
+function setMode(m){
+  MODE = m;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on", c.dataset.mode===m));
+  const ph = {brief:"Press Send for today's briefing…", plan:"Describe a goal, e.g. “prepare for the Microsoft interview”…",
+              coach:"Press Send, or ask about a specific habit…", ask:"Ask Nova anything — it'll route to the right agent…"};
+  $("msg").placeholder = ph[m]||"";
+}
+document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>setMode(c.dataset.mode)));
+
+async function send(){
+  const msg = $("msg").value.trim();
+  if(MODE==="plan" && !msg){ showErr("Enter a goal to plan."); return; }
+  $("send").disabled = true;
+  const out = $("out"); out.className = "out show";
+  out.innerHTML = '<div class="think"><span class="dot"></span> Nova is reading your data…</div>';
+  try{
+    const r = await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},
+                          body:JSON.stringify({mode:MODE, message:msg})});
+    const d = await r.json();
+    if(!r.ok){ showErr(d.message || "Something went wrong."); return; }
+    const tools = (d.tools_used||[]);
+    const trace = tools.length
+      ? '<div class="trace">Nova used: ' + tools.map(t=>'<span class="tchip">'+t+'</span>').join(" ") + '</div>'
+      : "";
+    out.innerHTML = trace + '<div class="card" id="card"></div>';
+    typeOut($("card"), d.response || "(no response)");
+  }catch(e){ showErr("Could not reach Nova: " + e.message); }
+  finally{ $("send").disabled = false; }
+}
+function showErr(m){ $("out").className="out show"; $("out").innerHTML = '<div class="card err">'+m+'</div>'; }
+function typeOut(el, text){
+  el.textContent = ""; let i=0;
+  const step = Math.max(1, Math.round(text.length/240));
+  (function tick(){ el.textContent = text.slice(0, i); i+=step; if(i<text.length+step) requestAnimationFrame(tick); else el.textContent=text; })();
+}
+$("send").addEventListener("click", send);
+$("msg").addEventListener("keydown", e=>{ if(e.key==="Enter" && (e.ctrlKey||e.metaKey)) send(); });
+
+loadContext();
+</script>
+</body>
+</html>
