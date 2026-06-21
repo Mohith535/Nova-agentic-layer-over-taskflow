@@ -135,9 +135,16 @@ def main(argv=None) -> None:
     try:
         out = _run_once(agent, message)
     except Exception as e:  # surface a clean error, not a stack trace
-        print(f"Nova run failed: {e}", file=sys.stderr)
+        msg = str(e)
+        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            msg = ("Gemini's free-tier daily limit was reached (resets every 24h). "
+                   "Try later, or set NOVA_GEMINI_MODEL to another model in .env.")
+        print(f"Nova: {msg}", file=sys.stderr)
         sys.exit(1)
-    print(out or "(no response)")
+    if not out:
+        out = ("I couldn't finish that — usually the Gemini free-tier daily limit (resets in 24h). "
+               "You can also set NOVA_GEMINI_MODEL to another model in .env.")
+    print(out)
 
 
 if __name__ == "__main__":

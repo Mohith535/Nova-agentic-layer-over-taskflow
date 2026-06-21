@@ -19,6 +19,7 @@ from ..models import (
     PostponePattern,
     TodayContext,
 )
+from ..memory.store import MemoryStore
 from ..security import input_validator as iv
 from ..security.audit import AuditLog
 from .taskflow_reader import TaskFlowReader
@@ -30,6 +31,8 @@ class NovaTools:
         self.reader = TaskFlowReader(data_dir)
         self.writer = TaskFlowWriter(data_dir)
         self.audit = AuditLog(self.reader.data_dir / "nova_audit.log")
+        # Memory is gated by the SAME consent toggle as the rest of the behavioral data.
+        self.memory = MemoryStore(self.reader.data_dir, enabled=self.reader.nova_data_enabled())
 
     # ---- READ -------------------------------------------------------------
     def get_tasks(self, status: str = "active", priority: Optional[str] = None,
@@ -147,3 +150,21 @@ class NovaTools:
         ok = self.writer.set_prime_target(int(task_id))
         self.audit.record("set_prime_target", {"id": int(task_id), "ok": ok})
         return ok
+
+    # ---- MEMORY (consent-gated, local, transparent) ----------------------
+    def recall_memory(self, limit: int = 20) -> list[dict]:
+        return self.memory.recall(limit)
+
+    def remember(self, note: str, kind: str = "pattern") -> dict:
+        entry = self.memory.remember(note, kind)
+        if entry:
+            self.audit.record("remember", {"kind": entry.get("kind"), "text": entry.get("text", "")[:60]})
+        return entry or {}
+
+    def all_memory(self) -> list[dict]:
+        return self.memory.all()
+
+    def forget_all(self) -> int:
+        n = self.memory.clear()
+        self.audit.record("forget_all", {"count": n})
+        return n

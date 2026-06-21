@@ -21,8 +21,11 @@ from typing import Optional
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset, StdioConnectionParams
 from mcp import StdioServerParameters
 
-READ_ONLY_TOOLS = ["get_today_context", "get_tasks", "get_behavioral_stats", "get_edit_history"]
+READ_ONLY_TOOLS = ["get_today_context", "get_tasks", "get_behavioral_stats", "get_edit_history", "recall_memory"]
 WRITE_TOOLS = ["create_task", "complete_task", "schedule_task", "set_prime_target"]
+# Memory is a separate, low-stakes capability: writing a note about the user can never mutate
+# their tasks. Kept distinct from WRITE_TOOLS so the read-only/task-write split stays clean.
+MEMORY_TOOLS = ["remember"]
 
 
 def mcp_toolset(data_dir: Optional[str] = None, tool_names: Optional[list[str]] = None,

@@ -42,7 +42,26 @@ def read_tools(t: NovaTools) -> list:
         most honest source of behavioral insight."""
         return [e.model_dump() for e in t.get_edit_history(task_id, days)]
 
-    return [get_today_context, get_tasks, get_behavioral_stats, get_edit_history]
+    def recall_memory() -> list:
+        """Recall what Nova has learned about THIS user across past sessions — durable patterns,
+        emotional signals, and preferences. Call this FIRST so your response is personalized and
+        continuous, not generic. Returns [] if the user has memory turned off."""
+        return t.recall_memory()
+
+    return [get_today_context, get_tasks, get_behavioral_stats, get_edit_history, recall_memory]
+
+
+def memory_write_tools(t: NovaTools) -> list:
+    def remember(note: str, kind: str = "pattern") -> dict:
+        """Store ONE short, specific, durable insight about the user for future sessions.
+        kind is one of: pattern | emotion | preference | fact. Examples:
+        'Forgets tasks that have no scheduled time' (pattern);
+        'Feels overwhelmed by #study tasks late at night' (emotion);
+        'Responds well to a 15-minute first step' (preference).
+        Only store something genuinely durable and useful — not the day's small talk."""
+        return t.remember(note, kind)
+
+    return [remember]
 
 
 def write_tools(t: NovaTools) -> list:

@@ -13,8 +13,8 @@ from google.adk.agents import Agent
 
 from ..config import gemini_model
 from ..mcp.tools import NovaTools
-from .mcp_backed import READ_ONLY_TOOLS, WRITE_TOOLS, mcp_toolset
-from .tools_adk import read_tools, write_tools
+from .mcp_backed import MEMORY_TOOLS, READ_ONLY_TOOLS, WRITE_TOOLS, mcp_toolset
+from .tools_adk import memory_write_tools, read_tools, write_tools
 
 PLANNING_INSTRUCTION = """\
 You are TaskFlow's Planning agent. You turn a goal into a small set of concrete, schedulable
@@ -41,9 +41,9 @@ the total estimated time, so the user sees the real cost of the plan before comm
 def build_planning_agent(tools: Optional[NovaTools] = None, model: Optional[str] = None,
                          *, use_mcp: bool = False, data_dir: Optional[str] = None) -> Agent:
     if use_mcp:
-        agent_tools = [mcp_toolset(data_dir, READ_ONLY_TOOLS + WRITE_TOOLS)]
+        agent_tools = [mcp_toolset(data_dir, READ_ONLY_TOOLS + WRITE_TOOLS + MEMORY_TOOLS)]
     else:
-        agent_tools = read_tools(tools) + write_tools(tools)
+        agent_tools = read_tools(tools) + write_tools(tools) + memory_write_tools(tools)
     return Agent(
         name="planning",
         model=model or gemini_model(),

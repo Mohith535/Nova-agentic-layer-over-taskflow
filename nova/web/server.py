@@ -63,6 +63,13 @@ def _capture(agent, message: str) -> tuple[str, list[str]]:
     return "\n".join(text_parts).strip(), ordered
 
 
+def _friendly_error(msg: str) -> str:
+    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+        return ("Gemini's free-tier daily limit was reached (it resets every 24h). "
+                "Try again later, or set NOVA_GEMINI_MODEL to another model in .env.")
+    return msg[:300]
+
+
 def build_app(dd: Optional[str] = None) -> FastAPI:
     app = FastAPI(title="Nova Console", docs_url=None, redoc_url=None)
     dd = dd or data_dir()
@@ -79,6 +86,19 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             "context": tools.get_today_context().model_dump(),
             "stats": tools.get_behavioral_stats().model_dump(),
         })
+
+    @app.get("/api/memory")
+    def memory():
+        """What Nova remembers about the user — transparency for the UI panel."""
+        return JSONResponse({
+            "memory": tools.all_memory(),
+            "enabled": tools.reader.nova_data_enabled(),
+        })
+
+    @app.delete("/api/memory")
+    def forget():
+        """Erase everything Nova remembers — the user's one-click right to be forgotten."""
+        return JSONResponse({"cleared": tools.forget_all()})
 
     @app.post("/api/agent")
     async def run_agent(req: AgentRequest):
@@ -109,8 +129,13 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         try:
             text, tools_used = await run_in_threadpool(_capture, agent, msg)
         except Exception as e:
-            return JSONResponse({"error": "run_failed", "message": str(e)}, status_code=500)
-        return JSONResponse({"response": text or "(no response)", "tools_used": tools_used, "mode": mode})
+            return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
+        if not text:
+            # Most common cause of an empty turn is the model's daily free-tier cap.
+            text = ("I couldn't finish that turn — this usually means the Gemini free-tier daily "
+                    "limit was reached (it resets every 24h). You can also set NOVA_GEMINI_MODEL "
+                    "to a different model in .env.")
+        return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
 
     return app
 

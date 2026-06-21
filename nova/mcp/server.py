@@ -80,6 +80,19 @@ def build_server(data_dir: Optional[str] = None) -> FastMCP:
         """Set today's single Prime Target (the One Frog Protocol — one per day)."""
         return tools.set_prime_target(task_id)
 
+    # ---- MEMORY tools (consent-gated, local, user-visible) ----
+    @mcp.tool()
+    def recall_memory(limit: int = 20) -> list[dict]:
+        """Recall durable insights Nova has learned about this user (patterns, emotions,
+        preferences) across sessions. Returns [] if the user has memory turned off."""
+        return tools.recall_memory(limit)
+
+    @mcp.tool()
+    def remember(note: str, kind: str = "pattern") -> dict:
+        """Store one short, specific, durable insight about the user for future sessions.
+        kind: pattern | emotion | preference | fact. Stored locally, shown to the user, erasable."""
+        return tools.remember(note, kind)
+
     return mcp
 
 

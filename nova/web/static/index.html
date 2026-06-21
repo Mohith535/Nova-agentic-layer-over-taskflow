@@ -100,6 +100,17 @@
   .focus-item .t{font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .focus-item .m{font-size:10.5px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
   .rail-empty{font-size:12px;color:var(--dim)}
+  .rail-h.row{display:flex;justify-content:space-between;align-items:center}
+  .forget{background:none;border:none;color:var(--dim);font-size:10px;cursor:pointer;font-family:var(--sans);text-transform:none;letter-spacing:0;padding:0}
+  .forget:hover{color:var(--red)}
+  .mem-item{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border)}
+  .mem-item:last-child{border-bottom:none}
+  .mem-k{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.4px;padding:2px 6px;border-radius:5px;flex-shrink:0;margin-top:1px}
+  .mem-k.pattern{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,transparent)}
+  .mem-k.emotion{color:var(--ai);background:color-mix(in srgb,var(--ai) 12%,transparent)}
+  .mem-k.preference{color:var(--green);background:color-mix(in srgb,var(--green) 12%,transparent)}
+  .mem-k.fact{color:var(--amber);background:color-mix(in srgb,var(--amber) 12%,transparent)}
+  .mem-t{font-size:12.5px;color:var(--text);line-height:1.45}
   /* scrollbars */
   ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#222b38;border-radius:8px;border:2px solid var(--bg)}
   ::-webkit-scrollbar-thumb:hover{background:#2c374a}
@@ -150,6 +161,8 @@
       </div>
       <div class="rail-h mt">Today</div>
       <div id="focus"><div class="rail-empty">Loading your board…</div></div>
+      <div class="rail-h mt row"><span>What Nova remembers</span><button class="forget" id="forget" title="Erase everything Nova remembers">clear</button></div>
+      <div id="memory"><div class="rail-empty">Nothing yet.</div></div>
     </aside>
   </div>
 </div>
@@ -224,7 +237,8 @@ async function send(){
     $("thinking")?.remove();
     if(!r.ok){ addNova(d.message||"Something went wrong.",null,true); }
     else{ addNova(d.response||"(no response)", d.tools_used||[]);
-          if(MODE==="plan") loadContext(); /* plan writes tasks → refresh the rail */ }
+          loadMemory();                       /* coach/ask may have stored a new memory */
+          if(MODE==="plan") loadContext(); }   /* plan writes tasks → refresh the rail */
   }catch(e){ $("thinking")?.remove(); addNova("Couldn't reach Nova: "+e.message,null,true); }
   finally{ busy=false; $("send").disabled=false; $("msg").focus(); }
 }
@@ -255,9 +269,28 @@ async function loadContext(){
   }catch(e){ $("focus").innerHTML='<div class="rail-empty">Could not load your board.</div>'; }
 }
 
+/* ---------- memory (what Nova remembers) ---------- */
+async function loadMemory(){
+  try{
+    const d=await (await fetch("/api/memory")).json();
+    const m=$("memory"); const items=d.memory||[];
+    if(!d.enabled){ m.innerHTML='<div class="rail-empty">Memory is off — turn it on in TaskFlow (OPERATOR M → Advanced).</div>'; return; }
+    if(!items.length){ m.innerHTML='<div class="rail-empty">Nothing yet — Nova learns as you talk.</div>'; return; }
+    m.innerHTML=items.slice(-12).reverse().map(x=>{
+      const k=esc(x.kind||"fact");
+      return '<div class="mem-item"><span class="mem-k '+k+'">'+k+'</span><span class="mem-t">'+esc(x.text||"")+'</span></div>';
+    }).join("");
+  }catch(e){}
+}
+$("forget").addEventListener("click",async()=>{
+  if(!confirm("Erase everything Nova remembers about you? This can't be undone.")) return;
+  try{ await fetch("/api/memory",{method:"DELETE"}); loadMemory(); }catch(e){}
+});
+
 /* ---------- welcome ---------- */
 addNova("I'm Nova — the brain of your TaskFlow. I read what you've actually been doing, so my read on you is grounded in real data, not guesses.\n\n- **Ask** me anything and I'll route it\n- **Brief** me for what to do right now\n- **Plan** turns a goal into real tasks\n- **Coach** tells you *why* you keep stalling\n\nWhat's on your mind?", []);
 loadContext();
+loadMemory();
 $("msg").focus();
 </script>
 </body>
