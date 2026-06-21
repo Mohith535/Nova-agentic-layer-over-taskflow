@@ -37,8 +37,17 @@ TaskFlow voice everywhere: concrete, judgment-free, no cheerleading, no emoji.
 """
 
 
-def build_orchestrator(data_dir: Optional[str] = None, model: Optional[str] = None) -> Agent:
-    tools = NovaTools(data_dir or default_data_dir())
+def build_orchestrator(data_dir: Optional[str] = None, model: Optional[str] = None,
+                       *, use_mcp: bool = False) -> Agent:
+    """Build the router + its three specialists.
+
+    `use_mcp=False` (default): the agents call the shared NovaTools in-process — reliable, the
+    primary multi-agent showcase. `use_mcp=True`: every specialist gets its tools from a live
+    `nova.mcp.server` subprocess over stdio, with the read-only/write split enforced per agent
+    *through MCP* — the load-bearing MCP demonstration.
+    """
+    dd = data_dir or default_data_dir()
+    tools = None if use_mcp else NovaTools(dd)
     m = model or gemini_model()
     return Agent(
         name="nova",
@@ -46,8 +55,8 @@ def build_orchestrator(data_dir: Optional[str] = None, model: Optional[str] = No
         description="Nova — multi-agent productivity intelligence over TaskFlow.",
         instruction=ROOT_INSTRUCTION,
         sub_agents=[
-            build_briefing_agent(tools, m),
-            build_planning_agent(tools, m),
-            build_coach_agent(tools, m),
+            build_briefing_agent(tools, m, use_mcp=use_mcp, data_dir=dd),
+            build_planning_agent(tools, m, use_mcp=use_mcp, data_dir=dd),
+            build_coach_agent(tools, m, use_mcp=use_mcp, data_dir=dd),
         ],
     )

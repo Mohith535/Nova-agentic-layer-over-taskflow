@@ -85,11 +85,16 @@ for a tool handling personal data. Eight typed tools:
 - **Read:** `get_today_context`, `get_tasks`, `get_behavioral_stats`, `get_edit_history`
 - **Write (validated + audited):** `create_task`, `complete_task`, `schedule_task`, `set_prime_target`
 
-The agents call the *same* tool implementations in-process (one tested codebase, two front doors).
+The agents call the *same* tool implementations two ways: **in-process** (the reliable default)
+or, with `--mcp`, **through this live server** — `nova ask --mcp` spawns `python -m nova.mcp.server`
+and the agents discover their tools over stdio, exactly as an external client would. The
+read-only/write split is enforced **per agent even over MCP** (the Coach literally cannot see the
+write tools). That makes the MCP server load-bearing, not decorative.
 
 ```bash
 python -m nova.mcp.server --selftest    # list the tools, no client needed
 python -m nova.mcp.server               # serve over stdio to any MCP client (Claude Desktop, ADK)
+nova ask --mcp "what should I do now?"  # the agents pull tools from the live server
 ```
 
 ## Security

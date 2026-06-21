@@ -8,10 +8,13 @@ target for the scheduled GitHub Action.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from google.adk.agents import Agent
 
 from ..config import gemini_model
 from ..mcp.tools import NovaTools
+from .mcp_backed import READ_ONLY_TOOLS, mcp_toolset
 from .tools_adk import read_tools
 
 BRIEFING_INSTRUCTION = """\
@@ -38,11 +41,13 @@ Voice:
 """
 
 
-def build_briefing_agent(tools: NovaTools, model: str | None = None) -> Agent:
+def build_briefing_agent(tools: Optional[NovaTools] = None, model: Optional[str] = None,
+                         *, use_mcp: bool = False, data_dir: Optional[str] = None) -> Agent:
+    agent_tools = [mcp_toolset(data_dir, READ_ONLY_TOOLS)] if use_mcp else read_tools(tools)
     return Agent(
         name="briefing",
         model=model or gemini_model(),
         description="Generates a daily mission briefing from live TaskFlow data (read-only).",
         instruction=BRIEFING_INSTRUCTION,
-        tools=read_tools(tools),
+        tools=agent_tools,
     )

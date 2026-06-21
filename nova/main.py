@@ -49,6 +49,9 @@ def main(argv=None) -> None:
 
     parser = argparse.ArgumentParser(prog="nova", description=f"Nova v{__version__} — TaskFlow intelligence layer.")
     parser.add_argument("--output", choices=["text", "markdown"], default="text")
+    parser.add_argument("--mcp", action="store_true",
+                        help="Route tools through the live MCP server (stdio subprocess) rather "
+                             "than in-process — demonstrates the real MCP transport.")
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("brief", help="A daily mission briefing from your live TaskFlow data.")
     p_plan = sub.add_parser("plan", help="Turn a goal into concrete TaskFlow tasks.")
@@ -89,27 +92,33 @@ def main(argv=None) -> None:
     from .config import data_dir
     from .mcp.tools import NovaTools
 
+    dd = data_dir()
+    use_mcp = args.mcp
+    tools = None if use_mcp else NovaTools(dd)  # in-process tools (skipped in MCP mode)
+    if use_mcp:
+        print("(routing through the live MCP server subprocess…)", file=sys.stderr)
+
     if args.cmd == "brief":
         from .agents.briefing_agent import build_briefing_agent
 
-        agent = build_briefing_agent(NovaTools(data_dir()))
+        agent = build_briefing_agent(tools, use_mcp=use_mcp, data_dir=dd)
         message = "Give me my briefing for right now."
     elif args.cmd == "plan":
         from .agents.planning_agent import build_planning_agent
 
-        agent = build_planning_agent(NovaTools(data_dir()))
+        agent = build_planning_agent(tools, use_mcp=use_mcp, data_dir=dd)
         message = " ".join(args.goal)
     elif args.cmd == "coach":
         from .agents.coach_agent import build_coach_agent
 
-        agent = build_coach_agent(NovaTools(data_dir()))
+        agent = build_coach_agent(tools, use_mcp=use_mcp, data_dir=dd)
         message = " ".join(args.question) or (
             "What patterns do you see in how I work, and what is the one thing I should change?"
         )
     elif args.cmd == "ask":
         from .orchestrator import build_orchestrator
 
-        agent = build_orchestrator(data_dir())
+        agent = build_orchestrator(dd, use_mcp=use_mcp)
         message = " ".join(args.message)
     else:
         parser.print_help()

@@ -41,7 +41,9 @@ nova/
 ```bash
 nova mcp --selftest                      # list MCP tools (no key)
 TASKFLOW_DATA_PATH=docs/sample_taskflow nova brief    # brief on the sample data (needs key)
-python -m nova.mcp.server                # serve MCP over stdio
+nova ask --mcp "what should I do now?"   # agents pull tools from the LIVE MCP server (stdio subprocess)
+python -m nova.mcp.server                # serve MCP over stdio to any client
+python eval/run_eval.py                  # key-free eval of the data layer + MCP least-privilege
 ```
 Verification without a key covers a lot: imports, `nova mcp --selftest`, and building the
 orchestrator (3 sub-agents + tool boundaries). The live LLM path needs `GEMINI_API_KEY`.
