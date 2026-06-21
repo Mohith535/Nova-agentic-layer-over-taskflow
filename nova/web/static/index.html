@@ -27,8 +27,30 @@
         box-shadow:0 0 22px color-mix(in srgb,var(--ai) 22%,transparent);color:#d6c2ff}
   .brand b{font-size:16px;font-weight:700;letter-spacing:-.2px}
   .brand span{display:block;font-size:11.5px;color:var(--muted);margin-top:-1px}
-  .pill{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);
+  .about-btn{margin-left:auto;background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+             font-size:12px;border-radius:18px;padding:6px 13px;cursor:pointer;font-family:var(--sans);transition:all .14s}
+  .about-btn:hover{color:var(--text);border-color:var(--dim)}
+  .pill{margin-left:10px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);
         padding:5px 11px;border-radius:20px;display:flex;align-items:center;gap:6px}
+  /* modal */
+  .modal-overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(6px);
+                 z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
+  .modal-overlay.show{display:flex;animation:rise .2s ease both}
+  .modal-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:480px;width:100%;
+              padding:24px;max-height:85vh;overflow-y:auto}
+  .modal-card h3{font-size:17px;margin-bottom:4px}
+  .modal-card .msub{color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.55}
+  .modal-card .cap{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);line-height:1.5}
+  .modal-card .cap:last-of-type{border-bottom:none}
+  .modal-card .cap b{color:var(--ai);min-width:46px}
+  .modal-card .credit{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.6}
+  .modal-x{float:right;background:none;border:none;color:var(--dim);font-size:22px;cursor:pointer;line-height:1;margin:-4px -4px 0 0}
+  .modal-x:hover{color:var(--text)}
+  .task-meta{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px}
+  .modal-actions{display:flex;gap:10px;margin-top:18px}
+  .m-btn{flex:1;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none}
+  .m-btn.primary{background:linear-gradient(135deg,var(--ai),#7c4ddb);color:#fff}
+  .m-btn.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center}
   .pill .led{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
   /* ---- body: chat + rail ---- */
   .body{display:flex;flex:1;min-height:0}
@@ -125,6 +147,7 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"/></svg>
     </div>
     <div class="brand"><b>Nova</b><span>the brain of TaskFlow</span></div>
+    <button class="about-btn" id="aboutBtn" title="How Nova works + about this project">How Nova works</button>
     <div class="pill" id="pill"><span class="led"></span> local</div>
   </header>
 
@@ -167,6 +190,8 @@
       <div id="memory"><div class="rail-empty">Nothing yet.</div></div>
     </aside>
   </div>
+
+  <div class="modal-overlay" id="modal"><div class="modal-card" id="modalCard"></div></div>
 </div>
 
 <script>
@@ -261,14 +286,14 @@ async function loadContext(){
     $("s-tagn").textContent=top?(top.avg_postpone.toFixed(1)+"× on avg"):"none yet";
     const ov=cx.overdue_total||0; const o=$("s-over"); o.textContent=ov; o.className="v "+(ov>0?"red":"green");
     if(cx.is_evening) $("pill").innerHTML='🌙 evening';
-    // focus list
-    const f=$("focus"); f.innerHTML="";
-    const items=[];
-    if(cx.prime_target) items.push({t:cx.prime_target.title,m:"★ Prime Target",c:"prime"});
-    (cx.overdue_candidates||[]).slice(0,3).forEach(t=>items.push({t:t.title,m:(t.priority||"")+" · overdue",c:"over"}));
-    if(!items.length){ f.innerHTML='<div class="rail-empty">Nothing scheduled — ask Nova to plan something.</div>'; }
-    else items.forEach(it=>{ const e=document.createElement("div"); e.className="focus-item "+it.c;
-        e.innerHTML='<div class="t">'+esc(it.t)+'</div><div class="m">'+esc(it.m)+'</div>'; f.appendChild(e); });
+    // focus list — clickable, opens a task popup
+    const f=$("focus"); f.innerHTML=""; window._today=[];
+    if(cx.prime_target) window._today.push({task:cx.prime_target, m:"★ Prime Target", c:"prime"});
+    (cx.overdue_candidates||[]).slice(0,3).forEach(t=>window._today.push({task:t, m:((t.priority||"")+" · overdue"), c:"over"}));
+    if(!window._today.length){ f.innerHTML='<div class="rail-empty">Nothing scheduled — ask Nova to plan something.</div>'; }
+    else window._today.forEach((it,i)=>{ const e=document.createElement("div"); e.className="focus-item "+it.c;
+        e.style.cursor="pointer"; e.title="Open"; e.onclick=()=>openTask(i);
+        e.innerHTML='<div class="t">'+esc(it.task.title)+'</div><div class="m">'+esc(it.m)+'</div>'; f.appendChild(e); });
   }catch(e){ $("focus").innerHTML='<div class="rail-empty">Could not load your board.</div>'; }
 }
 
@@ -290,8 +315,57 @@ $("forget").addEventListener("click",async()=>{
   try{ await fetch("/api/memory",{method:"DELETE"}); loadMemory(); }catch(e){}
 });
 
-/* ---------- welcome ---------- */
-addNova("I'm Nova — the brain of your TaskFlow. I read what you've actually been doing, so my read on you is grounded in real data, not guesses.\n\n- **Ask** me anything and I'll route it\n- **Brief** me for what to do right now\n- **Plan** turns a goal into real tasks\n- **Coach** tells you *why* you keep stalling\n\nWhat's on your mind?", []);
+/* ---------- modal (About + task popup) ---------- */
+function openModal(html){ $("modalCard").innerHTML=html; $("modal").classList.add("show"); }
+function closeModal(){ $("modal").classList.remove("show"); }
+$("modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+function openAbout(){
+  openModal(
+    '<button class="modal-x" onclick="closeModal()">×</button>'+
+    '<h3>How Nova works</h3>'+
+    '<div class="msub">Nova reads what you’ve actually been doing in TaskFlow, so its read on you is grounded in real data — not guesses. It never leaves your machine.</div>'+
+    '<div class="cap"><b>Ask</b><span>Say anything — Nova routes it to the right specialist.</span></div>'+
+    '<div class="cap"><b>Brief</b><span>What to do right now, from your live load and the time of day.</span></div>'+
+    '<div class="cap"><b>Plan</b><span>Turns a goal into real, right-sized TaskFlow tasks.</span></div>'+
+    '<div class="cap"><b>Coach</b><span>Tells you <i>why</i> you keep stalling — and one concrete change.</span></div>'+
+    '<div class="credit">Built for the <b style="color:var(--ai)">Kaggle × Google — AI Agents Intensive (Capstone 2026)</b>, '+
+    'on top of <b>TaskFlow v9.1.0</b>. A local-first second brain — your data stays on your machine.</div>'
+  );
+}
+$("aboutBtn").addEventListener("click",openAbout);
+
+function openTask(i){
+  const it=(window._today||[])[i]; if(!it) return; const t=it.task;
+  const dl=t.deadline?new Date(t.deadline).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"no deadline";
+  const over=t.is_overdue?' · <span style="color:var(--red)">overdue</span>':'';
+  openModal(
+    '<button class="modal-x" onclick="closeModal()">×</button>'+
+    '<h3>'+esc(t.title)+'</h3>'+
+    '<div class="task-meta">'+esc(t.priority||"")+(t.duration?(" · "+esc(t.duration)):"")+' · '+esc(dl)+over+'</div>'+
+    (t.notes?'<p style="margin-top:12px;color:var(--muted);font-size:13px;line-height:1.6">'+esc(t.notes)+'</p>':'')+
+    '<div class="modal-actions">'+
+      '<button class="m-btn primary" onclick="scheduleTomorrow('+t.id+')">Schedule for tomorrow</button>'+
+      '<a class="m-btn ghost" href="http://127.0.0.1:18083" target="_blank" rel="noopener">Open in TaskFlow ↗</a>'+
+    '</div>'+
+    '<div class="credit">Heavier edits — notes, links, sub-tasks, exact deadlines — live in the TaskFlow dashboard.</div>'
+  );
+}
+window.scheduleTomorrow=async(id)=>{
+  try{
+    const r=await fetch("/api/task/schedule",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task_id:id,date:"tomorrow"})});
+    const d=await r.json(); closeModal();
+    if(d.ok){ loadContext(); addNova("Done — scheduled **"+esc((d.task&&d.task.title)||"that")+"** for tomorrow.",[]); }
+  }catch(e){ closeModal(); }
+};
+
+/* ---------- dynamic greeting (the alive opener) ---------- */
+async function loadGreeting(){
+  try{ const d=await (await fetch("/api/greeting")).json(); addNova(d.greeting||"Hey — I'm Nova. What's on your mind?", []); }
+  catch(e){ addNova("Hey — I'm Nova, the brain of your TaskFlow. What's on your mind?", []); }
+}
+loadGreeting();
 loadContext();
 loadMemory();
 $("msg").focus();
