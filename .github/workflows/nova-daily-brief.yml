@@ -1,0 +1,44 @@
+name: Nova Daily Brief
+
+# Deployability proof. Runs Nova's read-only Briefing agent on a schedule and writes the
+# briefing into the run summary. It uses a committed, sanitized sample dataset by default, so
+# it goes green without exposing anyone's real data — point TASKFLOW_DATA_PATH at restored
+# data (or a TASKFLOW_TASKS_JSON secret) to brief on real tasks.
+
+on:
+  schedule:
+    - cron: "30 2 * * *" # 08:00 IST (02:30 UTC), daily
+  workflow_dispatch: {} # manual trigger — use this for the demo video
+
+permissions:
+  contents: read
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Nova
+        run: pip install -e .
+
+      - name: Use real data if provided (optional)
+        if: ${{ secrets.TASKFLOW_TASKS_JSON != '' }}
+        run: |
+          mkdir -p "$HOME/.taskflow"
+          printf '%s' "${{ secrets.TASKFLOW_TASKS_JSON }}" > "$HOME/.taskflow/tasks.json"
+          echo "TASKFLOW_DATA_PATH=$HOME/.taskflow" >> "$GITHUB_ENV"
+
+      - name: Nova daily brief
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Defaults to the committed sample; overridden above when a data secret is present.
+          TASKFLOW_DATA_PATH: ${{ env.TASKFLOW_DATA_PATH || format('{0}/docs/sample_taskflow', github.workspace) }}
+        run: |
+          echo "## Nova — your brief for $(date -u '+%Y-%m-%d')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python -m nova brief --output markdown >> "$GITHUB_STEP_SUMMARY"

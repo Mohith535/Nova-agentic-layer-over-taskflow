@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nova-taskflow"
+version = "0.1.0"
+description = "Nova — a multi-agent productivity intelligence layer built on TaskFlow v9.1.0"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "K Mohith Kannan" }]
+keywords = ["ai-agents", "adk", "mcp", "productivity", "behavioral", "taskflow"]
+dependencies = [
+    "pydantic>=2.0",
+    "mcp>=1.0.0",
+    "google-adk>=0.2.0",
+    "google-generativeai>=0.8.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+# Fully-offline model backend — a local LLM via Ollama, for a zero-exfiltration setup.
+local = ["ollama>=0.3.0"]
+
+[project.scripts]
+nova = "nova.main:main"
+
+[tool.setuptools.packages.find]
+include = ["nova*"]
