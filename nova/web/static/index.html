@@ -51,6 +51,7 @@
   .m-btn{flex:1;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-align:center;text-decoration:none}
   .m-btn.primary{background:linear-gradient(135deg,var(--ai),#7c4ddb);color:#fff}
   .m-btn.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center}
+  .m-btn.danger{background:color-mix(in srgb,var(--red) 88%,#000);color:#fff}
   .pill .led{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
   /* ---- body: chat + rail ---- */
   .body{display:flex;flex:1;min-height:0}
@@ -310,10 +311,23 @@ async function loadMemory(){
     }).join("");
   }catch(e){}
 }
-$("forget").addEventListener("click",async()=>{
-  if(!confirm("Erase everything Nova remembers about you? This can't be undone.")) return;
-  try{ await fetch("/api/memory",{method:"DELETE"}); loadMemory(); }catch(e){}
+$("forget").addEventListener("click",()=>{
+  openModal(
+    '<button class="modal-x" onclick="closeModal()">×</button>'+
+    '<h3>Start fresh with Nova?</h3>'+
+    '<div class="msub">This erases everything I’ve learned about you — patterns, emotional notes, preferences. '+
+    'Your tasks in TaskFlow stay untouched; only my memory of <i>you</i> resets. It can’t be undone.</div>'+
+    '<div class="modal-actions">'+
+      '<button class="m-btn ghost" onclick="closeModal()">Keep it</button>'+
+      '<button class="m-btn danger" onclick="doForget()">Erase &amp; start fresh</button>'+
+    '</div>'
+  );
 });
+window.doForget=async()=>{
+  try{ await fetch("/api/memory",{method:"DELETE"}); }catch(e){}
+  closeModal(); loadMemory();
+  addNova("Done — clean slate. I’m not carrying anything forward; nothing you said before will color what I say next. Whenever you’re ready, we start from zero.",[]);
+};
 
 /* ---------- modal (About + task popup) ---------- */
 function openModal(html){ $("modalCard").innerHTML=html; $("modal").classList.add("show"); }
