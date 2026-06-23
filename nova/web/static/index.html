@@ -52,6 +52,22 @@
   .m-btn.primary{background:linear-gradient(135deg,var(--ai),#7c4ddb);color:#fff}
   .m-btn.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center}
   .m-btn.danger{background:color-mix(in srgb,var(--red) 88%,#000);color:#fff}
+  /* plan proposal card */
+  .plan-intro{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+  .plan-list{display:flex;flex-direction:column;gap:10px}
+  .plan-row{background:color-mix(in srgb,var(--text) 3%,transparent);border:1px solid var(--border);border-radius:10px;padding:10px}
+  .pr-title{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
+  .pr-title:focus{border-color:var(--ai)}
+  .pr-meta{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+  .pr-pri,.pr-dur,.pr-dl{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;color:var(--text);font-size:12px;font-family:inherit;outline:none}
+  .pr-dl{flex:1;min-width:130px}
+  .pr-x{background:none;border:none;color:var(--dim);font-size:18px;line-height:1;cursor:pointer;padding:0 4px}
+  .pr-x:hover{color:var(--red)}
+  .pr-notes{font-size:11px;color:var(--dim);margin-top:6px;line-height:1.4}
+  .plan-actions{display:flex;gap:10px;margin-top:14px;align-items:center}
+  .plan-actions .m-btn{flex:0 1 auto;padding:9px 16px}
+  .plan-actions .m-btn.primary{flex:1}
+  .plan-done{color:var(--green);font-size:13px;font-weight:600}
   .pill .led{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
   /* ---- body: chat + rail ---- */
   .body{display:flex;flex:1;min-height:0}
@@ -260,19 +276,85 @@ async function send(){
   ta.value=""; ta.style.height="auto";
   addThinking();
   try{
-    const r=await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},
-                        body:JSON.stringify({mode:MODE,message:text,fast:FAST})});
-    const d=await r.json();
-    $("thinking")?.remove();
-    if(!r.ok){ addNova(d.message||"Something went wrong.",null,true); }
-    else{ addNova(d.response||"(no response)", d.tools_used||[]);
-          loadMemory();                       /* coach/ask may have stored a new memory */
-          if(MODE==="plan") loadContext(); }   /* plan writes tasks → refresh the rail */
+    if(MODE==="plan"){
+      /* Plan = propose first (writes nothing); the user reviews/edits and confirms. */
+      const r=await fetch("/api/plan/propose",{method:"POST",headers:{"Content-Type":"application/json"},
+                          body:JSON.stringify({goal:text})});
+      const d=await r.json();
+      $("thinking")?.remove();
+      if(!r.ok){ addNova(d.message||"Couldn't plan that.",null,true); }
+      else if(!(d.tasks&&d.tasks.length)){ addNova("I couldn't break that into clear steps — try a more specific goal?",[]); }
+      else{ addPlanProposal(d.tasks, d.goal); }
+    } else {
+      const r=await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},
+                          body:JSON.stringify({mode:MODE,message:text,fast:FAST})});
+      const d=await r.json();
+      $("thinking")?.remove();
+      if(!r.ok){ addNova(d.message||"Something went wrong.",null,true); }
+      else{ addNova(d.response||"(no response)", d.tools_used||[]);
+            loadMemory(); }
+    }
   }catch(e){ $("thinking")?.remove(); addNova("Couldn't reach Nova: "+e.message,null,true); }
   finally{ busy=false; $("send").disabled=false; $("msg").focus(); }
 }
 $("send").addEventListener("click",send);
 $("msg").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); send(); } });
+
+/* ---------- plan: propose → review/edit → confirm → commit ---------- */
+let planSeq=0;
+function planRow(t){
+  const pOpts=["critical","strategic","noise"].map(p=>'<option'+((t.priority||"strategic")===p?' selected':'')+'>'+p+'</option>').join("");
+  const dOpts=["15m","30m","1h","2h","3h","4h+"].map(d=>'<option'+((t.duration||"1h")===d?' selected':'')+'>'+d+'</option>').join("");
+  return '<div class="plan-row" data-row>'
+    +'<input class="pr-title" value="'+esc(t.title||"")+'" placeholder="task…">'
+    +'<div class="pr-meta">'
+      +'<select class="pr-pri">'+pOpts+'</select>'
+      +'<select class="pr-dur">'+dOpts+'</select>'
+      +'<input class="pr-dl" value="'+esc(t.deadline||"")+'" placeholder="deadline (optional)">'
+      +'<button class="pr-x" title="remove" onclick="this.closest(\'[data-row]\').remove()">×</button>'
+    +'</div>'
+    +(t.notes?'<div class="pr-notes">'+esc(t.notes)+'</div>':'')
+    +'</div>';
+}
+function addPlanProposal(tasks, goal){
+  const pid="plan"+(++planSeq);
+  const el=document.createElement("div"); el.className="msg nova"; el.id=pid;
+  el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova · proposed plan</div>'
+    +'<div class="bubble">'
+      +'<div class="plan-intro">Here\'s how I\'d break down <b>'+esc(goal)+'</b>. Edit anything — '
+      +'<b>nothing is saved until you confirm</b>.</div>'
+      +'<div class="plan-list">'+tasks.map(planRow).join("")+'</div>'
+      +'<div class="plan-actions">'
+        +'<button class="m-btn ghost" onclick="addPlanRow(\''+pid+'\')">+ Add step</button>'
+        +'<button class="m-btn primary" onclick="commitPlan(\''+pid+'\')">Create '+tasks.length+' in TaskFlow →</button>'
+      +'</div>'
+    +'</div></div></div>';
+  $("stream").appendChild(el); scrollDown();
+}
+window.addPlanRow=(pid)=>{ const list=$(pid)&&$(pid).querySelector(".plan-list");
+  if(list){ const tmp=document.createElement("div"); tmp.innerHTML=planRow({}); list.appendChild(tmp.firstElementChild); } };
+window.commitPlan=async(pid)=>{
+  const card=$(pid); if(!card) return;
+  const rows=[...card.querySelectorAll("[data-row]")];
+  const tasks=rows.map(r=>({
+    title:r.querySelector(".pr-title").value.trim(),
+    priority:r.querySelector(".pr-pri").value,
+    duration:r.querySelector(".pr-dur").value,
+    deadline:r.querySelector(".pr-dl").value.trim()||null,
+    notes:(r.querySelector(".pr-notes")?r.querySelector(".pr-notes").textContent:"")
+  })).filter(t=>t.title);
+  if(!tasks.length){ return; }
+  const btn=card.querySelector(".plan-actions .primary"); if(btn){ btn.disabled=true; btn.textContent="Creating…"; }
+  try{
+    const r=await fetch("/api/plan/commit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tasks})});
+    const d=await r.json();
+    const act=card.querySelector(".plan-actions");
+    if(act) act.innerHTML='<div class="plan-done">✓ Created '+(d.count||0)+' task'+((d.count||0)===1?'':'s')+' in TaskFlow.</div>';
+    card.querySelectorAll(".pr-title,.pr-pri,.pr-dur,.pr-dl,.pr-x").forEach(e=>e.disabled=true);
+    loadContext();
+    addNova("Added **"+(d.count||0)+"** to your board. Want me to set the first as today's Prime Target, or talk through where to start?",[]);
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent="Create in TaskFlow →"; } }
+};
 $("msg").addEventListener("input",function(){ this.style.height="auto"; this.style.height=Math.min(this.scrollHeight,200)+"px"; });
 
 /* ---------- grounding rail ---------- */

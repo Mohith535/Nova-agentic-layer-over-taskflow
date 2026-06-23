@@ -42,6 +42,14 @@ class ScheduleReq(BaseModel):
     date: str = "tomorrow"
 
 
+class ProposeReq(BaseModel):
+    goal: str = ""
+
+
+class CommitReq(BaseModel):
+    tasks: list = []
+
+
 def _read_state(dd) -> dict:
     p = Path(dd) / "nova_state.json"
     try:
@@ -193,6 +201,50 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         """Light edit from the rail popup; heavier edits happen in the TaskFlow UI."""
         t = tools.schedule_task(req.task_id, req.date)
         return JSONResponse({"ok": t is not None, "task": t.model_dump() if t else None})
+
+    @app.post("/api/plan/propose")
+    async def plan_propose(req: ProposeReq):
+        """PROPOSE a task breakdown — a preview, written nowhere. The user reviews/edits, then
+        confirms via /api/plan/commit. This is the human-in-the-loop gate."""
+        if not ensure_api_key():
+            return JSONResponse({"error": "no_api_key",
+                                 "message": "Set GEMINI_API_KEY in .env to let Nova plan."},
+                                status_code=400)
+        goal = (req.goal or "").strip()
+        if not goal:
+            return JSONResponse({"error": "need_goal", "message": "Tell me the goal to break down."},
+                                status_code=400)
+        from ..agents.planner_propose import propose_tasks
+        try:
+            tasks = await run_in_threadpool(propose_tasks, tools, goal)
+        except Exception as e:
+            return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
+        return JSONResponse({"tasks": tasks, "goal": goal})
+
+    @app.post("/api/plan/commit")
+    def plan_commit(req: CommitReq):
+        """COMMIT the (possibly user-edited) proposal — the separate executor that actually writes
+        the tasks to TaskFlow, only after the user said yes. Validated + audited via create_task."""
+        created, failed = [], 0
+        for t in (req.tasks or [])[:12]:
+            if not isinstance(t, dict):
+                continue
+            title = (t.get("title") or "").strip()
+            if not title:
+                continue
+            try:
+                nt = tools.create_task(
+                    title=title,
+                    priority=t.get("priority") or "strategic",
+                    tags=t.get("tags"),
+                    deadline=t.get("deadline"),
+                    duration=t.get("duration"),
+                    notes=t.get("notes"),
+                )
+                created.append(nt.model_dump())
+            except Exception:
+                failed += 1
+        return JSONResponse({"created": created, "count": len(created), "failed": failed})
 
     @app.post("/api/agent")
     async def run_agent(req: AgentRequest):
