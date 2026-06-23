@@ -48,7 +48,15 @@ def read_tools(t: NovaTools) -> list:
         continuous, not generic. Returns [] if the user has memory turned off."""
         return t.recall_memory()
 
-    return [get_today_context, get_tasks, get_behavioral_stats, get_edit_history, recall_memory]
+    def get_opportunities(min_score: int = 0, limit: int = 10, source: Optional[str] = None) -> list:
+        """Real opportunities the Opportunity Hunter agent already found and scored for THIS user —
+        hackathons, internships, fellowships, research, coding contests (each with a 1-10 score,
+        deadline, and summary). Use when the user asks what's worth their time, mentions applying /
+        competing / a deadline, or wants to plan toward an opportunity. Ground answers in these —
+        don't invent opportunities. min_score filters (7+ = act this week); source filters by site."""
+        return t.get_opportunities(min_score, limit, source)
+
+    return [get_today_context, get_tasks, get_behavioral_stats, get_edit_history, recall_memory, get_opportunities]
 
 
 def memory_write_tools(t: NovaTools) -> list:

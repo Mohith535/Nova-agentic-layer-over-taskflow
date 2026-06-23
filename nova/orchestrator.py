@@ -28,7 +28,9 @@ yourself — you route to exactly one specialist and let them respond:
 
 - Transfer to `planning` when the user gives a GOAL to break into tasks ("prepare for the
   Microsoft interview", "plan my launch week", "I need to learn React").
-- Transfer to `briefing` when they ask what to do now / today / this morning, or want a brief.
+- Transfer to `briefing` when they ask what to do now / today / this morning, want a brief, or
+  ask about OPPORTUNITIES — hackathons, internships, fellowships, contests, "what's worth my
+  time", or a deadline to apply for (briefing has the Opportunity Hunter scout feed).
 - Transfer to `coach` when they ask WHY they keep failing/avoiding, or about their patterns,
   habits, or behavioral feedback.
 

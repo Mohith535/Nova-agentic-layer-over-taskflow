@@ -55,6 +55,14 @@ def build_server(data_dir: Optional[str] = None) -> FastMCP:
         gave when moving deadlines. This is the substrate for behavioral coaching."""
         return [e.model_dump() for e in tools.get_edit_history(task_id, days)]
 
+    @mcp.tool()
+    def get_opportunities(min_score: int = 0, limit: int = 10, source: Optional[str] = None) -> list[dict]:
+        """Opportunities the Opportunity Hunter agent already found + scored 1-10 for this user
+        (hackathons, internships, fellowships, research, contests; each with deadline + summary).
+        Read-only — Nova reads what the hunter found; it never runs the hunt. min_score filters
+        (7+ = act this week), source filters by site."""
+        return tools.get_opportunities(min_score, limit, source)
+
     # ---- WRITE tools (validated + audited) ----
     @mcp.tool()
     def create_task(title: str, priority: str = "medium", tags: Optional[list[str]] = None,

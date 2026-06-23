@@ -165,6 +165,11 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             "stats": tools.get_behavioral_stats().model_dump(),
         })
 
+    @app.get("/api/opportunities")
+    def opportunities():
+        """Opportunities the Opportunity Hunter agent found + scored — the Scout feed (no LLM)."""
+        return JSONResponse({"opportunities": tools.get_opportunities(min_score=0, limit=12)})
+
     @app.get("/api/memory")
     def memory():
         """What Nova remembers about the user — transparency for the UI panel."""

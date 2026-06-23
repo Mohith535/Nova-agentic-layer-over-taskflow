@@ -119,6 +119,83 @@ class NovaTools:
     def get_edit_history(self, task_id: Optional[int] = None, days: int = 7) -> list[EditEvent]:
         return self.reader.load_edit_history(days=days, task_id=task_id)
 
+    def get_opportunities(self, min_score: int = 0, limit: int = 10,
+                          source: Optional[str] = None) -> list[dict]:
+        """Opportunities surfaced by the Opportunity Hunter agent (hackathons, internships,
+        fellowships, research, contests) — already filtered to the user's profile and scored 1–10.
+
+        Read-only bridge: Nova never runs the hunt, it reads what the hunter already found and
+        deduped, so it can discuss real opportunities and (on the user's say-so) turn them into
+        tasks. Resolves the findings file from NOVA_OPPORTUNITIES_PATH, then known locations.
+        """
+        import json
+        import os
+        from pathlib import Path
+
+        candidates = []
+        env = os.environ.get("NOVA_OPPORTUNITIES_PATH")
+        if env:
+            candidates.append(Path(env))
+        candidates += [
+            Path(self.reader.data_dir) / "opportunities.json",
+            Path.home() / ".taskflow" / "opportunities.json",
+            Path("E:/agent for my self/data/history.json"),
+        ]
+        path = next((p for p in candidates if p.exists()), None)
+        if not path:
+            return []
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+
+        items: list[dict] = []
+        if isinstance(data, dict) and "runs" in data:
+            for run in data.get("runs", []):
+                items.extend(run.get("items", []) or [])
+        elif isinstance(data, list):
+            items = data
+
+        # Dedup by native id / url / title — latest run wins.
+        seen: dict[str, dict] = {}
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            key = it.get("native_id") or it.get("url") or it.get("title")
+            if key:
+                seen[key] = it
+
+        def _score(o: dict) -> int:
+            # ai_score is -1 until Opportunity Hunter's Phase-2 LLM scorer runs, so only trust it
+            # when positive; otherwise fall back to the rule-based score.
+            for k in ("ai_score", "score"):
+                try:
+                    v = int(o.get(k) or 0)
+                except (TypeError, ValueError):
+                    v = 0
+                if v > 0:
+                    return v
+            return 0
+
+        opps = list(seen.values())
+        if source:
+            opps = [o for o in opps if (o.get("source") or "").lower() == source.lower()]
+        opps = [o for o in opps if _score(o) >= int(min_score or 0)]
+        opps.sort(key=lambda o: (_score(o), o.get("deadline") or ""), reverse=True)
+
+        out = []
+        for o in opps[: max(1, min(int(limit or 10), 25))]:
+            out.append({
+                "title": o.get("title", ""),
+                "source": o.get("source", ""),
+                "url": o.get("url", ""),
+                "score": _score(o),
+                "deadline": o.get("deadline"),
+                "summary": (o.get("ai_summary") or o.get("description") or "")[:240],
+                "tags": o.get("tags", []) or [],
+            })
+        return out
+
     # ---- WRITE (validated + audited) -------------------------------------
     def create_task(self, title: str, priority: str = "medium", tags=None,
                     deadline: Optional[str] = None, duration: Optional[str] = None,
