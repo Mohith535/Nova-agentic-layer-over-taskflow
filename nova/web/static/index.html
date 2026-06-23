@@ -545,8 +545,15 @@ function addNova(text, tools, isErr){
 
 /* ---------- dynamic greeting (the alive opener) ---------- */
 async function loadGreeting(){
-  try{ const d=await (await fetch("/api/greeting")).json(); addNova(d.greeting||"Hey — I'm Nova. What's on your mind?", []); }
-  catch(e){ addNova("Hey — I'm Nova, the brain of your TaskFlow. What's on your mind?", []); }
+  addThinking();
+  try{
+    const d=await (await fetch("/api/greeting")).json();
+    $("thinking")?.remove();
+    addNova(d.greeting||"Hey — I'm Nova. What's on your mind?", []);
+  }catch(e){
+    $("thinking")?.remove();
+    addNova("Hey — I'm Nova, the brain of your TaskFlow. What's on your mind?", []);
+  }
 }
 loadGreeting();
 loadContext();
