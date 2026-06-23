@@ -88,6 +88,29 @@ class MemoryStore:
             return "(nothing remembered yet)"
         return "\n".join(f"- [{m.get('kind', 'note')}] {m.get('text', '')}" for m in mems)
 
+    def delete_one(self, entry_id: int) -> bool:
+        """Remove a single entry by id (the user's right to correct Nova's record)."""
+        mems = self._load()
+        new = [m for m in mems if m.get("id") != int(entry_id)]
+        if len(new) == len(mems):
+            return False
+        self._save(new)
+        return True
+
+    def update_one(self, entry_id: int, text: str) -> dict | None:
+        """Edit the text of a single memory entry in-place."""
+        text = (text or "").strip()[:_MAX_LEN]
+        if not text:
+            return None
+        mems = self._load()
+        for m in mems:
+            if m.get("id") == int(entry_id):
+                m["text"] = text
+                m["edited_at"] = datetime.now().isoformat()
+                self._save(mems)
+                return m
+        return None
+
     def clear(self) -> int:
         """Erase all memory (the user's right). Returns how many entries were removed."""
         n = len(self._load())

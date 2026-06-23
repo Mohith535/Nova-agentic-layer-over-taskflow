@@ -50,6 +50,10 @@ class CommitReq(BaseModel):
     tasks: list = []
 
 
+class MemoryUpdateReq(BaseModel):
+    text: str = ""
+
+
 def _read_state(dd) -> dict:
     p = Path(dd) / "nova_state.json"
     try:
@@ -190,6 +194,18 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
     def forget():
         """Erase everything Nova remembers — the user's one-click right to be forgotten."""
         return JSONResponse({"cleared": tools.forget_all()})
+
+    @app.delete("/api/memory/{entry_id}")
+    def forget_one(entry_id: int):
+        """Remove a single memory entry by id."""
+        ok = tools.forget_one(entry_id)
+        return JSONResponse({"ok": ok})
+
+    @app.patch("/api/memory/{entry_id}")
+    def update_memory(entry_id: int, req: MemoryUpdateReq):
+        """Edit the text of a single memory entry in-place."""
+        entry = tools.update_memory(entry_id, req.text)
+        return JSONResponse({"ok": bool(entry), "entry": entry})
 
     @app.get("/api/greeting")
     def greeting():

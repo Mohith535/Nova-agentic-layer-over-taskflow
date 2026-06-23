@@ -241,6 +241,18 @@ class NovaTools:
     def all_memory(self) -> list[dict]:
         return self.memory.all()
 
+    def forget_one(self, entry_id: int) -> bool:
+        ok = self.memory.delete_one(int(entry_id))
+        if ok:
+            self.audit.record("forget_one", {"id": int(entry_id)})
+        return ok
+
+    def update_memory(self, entry_id: int, text: str) -> dict:
+        entry = self.memory.update_one(int(entry_id), text)
+        if entry:
+            self.audit.record("update_memory", {"id": int(entry_id), "text": (text or "")[:60]})
+        return entry or {}
+
     def forget_all(self) -> int:
         n = self.memory.clear()
         self.audit.record("forget_all", {"count": n})

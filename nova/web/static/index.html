@@ -150,7 +150,23 @@
   .mem-k.emotion{color:var(--ai);background:color-mix(in srgb,var(--ai) 12%,transparent)}
   .mem-k.preference{color:var(--green);background:color-mix(in srgb,var(--green) 12%,transparent)}
   .mem-k.fact{color:var(--amber);background:color-mix(in srgb,var(--amber) 12%,transparent)}
-  .mem-t{font-size:12.5px;color:var(--text);line-height:1.45}
+  .mem-t{font-size:12.5px;color:var(--text);line-height:1.45;flex:1;cursor:text;border-radius:4px;padding:1px 3px;transition:background .12s}
+  .mem-t:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
+  .mem-del{background:none;border:none;color:var(--dim);font-size:14px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0;opacity:0;transition:opacity .14s}
+  .mem-item:hover .mem-del{opacity:1}
+  .mem-del:hover{color:var(--red)}
+  /* opportunity cards */
+  .opp-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:8px}
+  .opp-title{font-size:12.5px;color:var(--text);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .opp-meta{font-size:10.5px;color:var(--muted);margin-top:4px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .opp-score{display:inline-block;background:color-mix(in srgb,var(--ai) 14%,transparent);border:1px solid color-mix(in srgb,var(--ai) 28%,transparent);color:#d6c2ff;border-radius:5px;font-size:10px;padding:1px 6px;font-family:var(--mono);margin-right:6px}
+  .opp-btn{margin-top:8px;width:100%;background:color-mix(in srgb,var(--ai) 12%,transparent);border:1px solid color-mix(in srgb,var(--ai) 25%,transparent);color:#d6c2ff;border-radius:7px;padding:6px 10px;font-size:11.5px;cursor:pointer;font-family:inherit;text-align:left;transition:background .14s}
+  .opp-btn:hover{background:color-mix(in srgb,var(--ai) 24%,transparent);border-color:color-mix(in srgb,var(--ai) 45%,transparent)}
+  /* MCP flow trace */
+  .flow-trace{display:flex;align-items:center;gap:0;flex-wrap:wrap;margin-bottom:9px;font-size:10.5px}
+  .ft-node{font-family:var(--mono);color:var(--blue);background:color-mix(in srgb,var(--blue) 9%,transparent);border:1px solid color-mix(in srgb,var(--blue) 22%,transparent);border-radius:6px;padding:2px 8px}
+  .ft-node.agent{color:var(--ai);background:color-mix(in srgb,var(--ai) 9%,transparent);border-color:color-mix(in srgb,var(--ai) 22%,transparent)}
+  .ft-arrow{color:var(--dim);padding:0 4px;font-size:11px}
   /* scrollbars */
   ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#222b38;border-radius:8px;border:2px solid var(--bg)}
   ::-webkit-scrollbar-thumb:hover{background:#2c374a}
@@ -203,6 +219,8 @@
       </div>
       <div class="rail-h mt">Today</div>
       <div id="focus"><div class="rail-empty">Loading your board…</div></div>
+      <div class="rail-h mt">Scout — Opportunities</div>
+      <div id="opps"><div class="rail-empty">Loading scout feed…</div></div>
       <div class="rail-h mt row"><span>What Nova remembers</span><button class="forget" id="forget" title="Erase everything Nova remembers">clear</button></div>
       <div id="memory"><div class="rail-empty">Nothing yet.</div></div>
     </aside>
@@ -388,11 +406,30 @@ async function loadMemory(){
     if(!d.enabled){ m.innerHTML='<div class="rail-empty">Memory is off — turn it on in TaskFlow (OPERATOR M → Advanced).</div>'; return; }
     if(!items.length){ m.innerHTML='<div class="rail-empty">Nothing yet — Nova learns as you talk.</div>'; return; }
     m.innerHTML=items.slice(-12).reverse().map(x=>{
-      const k=esc(x.kind||"fact");
-      return '<div class="mem-item"><span class="mem-k '+k+'">'+k+'</span><span class="mem-t">'+esc(x.text||"")+'</span></div>';
+      const k=esc(x.kind||"fact"); const id=x.id||0;
+      return `<div class="mem-item" id="mem-${id}">
+        <span class="mem-k ${k}">${k}</span>
+        <span class="mem-t" contenteditable="true" data-id="${id}" onblur="saveMemEdit(this)"
+              title="Click to edit">${esc(x.text||"")}</span>
+        <button class="mem-del" onclick="deleteMemEntry(${id})" title="Remove this memory">×</button>
+      </div>`;
     }).join("");
   }catch(e){}
 }
+window.deleteMemEntry=async(id)=>{
+  try{
+    await fetch(`/api/memory/${id}`,{method:"DELETE"});
+    const el=document.getElementById(`mem-${id}`); if(el) el.remove();
+    if(!($("memory")&&$("memory").querySelector(".mem-item")))
+      $("memory").innerHTML='<div class="rail-empty">Nothing yet — Nova learns as you talk.</div>';
+  }catch(e){}
+};
+window.saveMemEdit=async(el)=>{
+  const id=el.dataset.id; const text=el.textContent.trim();
+  if(!id||!text) return;
+  try{ await fetch(`/api/memory/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})}); }
+  catch(e){}
+};
 $("forget").addEventListener("click",()=>{
   openModal(
     '<button class="modal-x" onclick="closeModal()">×</button>'+
@@ -456,6 +493,56 @@ window.scheduleTomorrow=async(id)=>{
   }catch(e){ closeModal(); }
 };
 
+/* ---------- Scout opportunities ---------- */
+let _oppData=[];
+async function loadOpportunities(){
+  const el=$("opps"); if(!el) return;
+  try{
+    const d=await(await fetch("/api/opportunities")).json();
+    const items=(d.opportunities||[]).slice(0,4);
+    _oppData=items;
+    if(!items.length){ el.innerHTML='<div class="rail-empty">No opportunities yet — run Opportunity Hunter to populate.</div>'; return; }
+    el.innerHTML=items.map((o,i)=>{
+      const dl=o.deadline?`<br>due ${o.deadline.slice(0,10)}`:'';
+      const score=o.score?`<span class="opp-score">${o.score}/10</span>`:'';
+      return `<div class="opp-item">
+        <div class="opp-title">${esc(o.title)}</div>
+        <div class="opp-meta">${score}${esc(o.source||'')}${dl}</div>
+        <button class="opp-btn" onclick="planFromOpportunity(${i})">→ Plan this in TaskFlow</button>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML='<div class="rail-empty">Scout feed unavailable.</div>'; }
+}
+window.planFromOpportunity=function(i){
+  const o=_oppData[i]; if(!o) return;
+  MODE='plan';
+  document.querySelectorAll(".chip[data-mode]").forEach(c=>c.classList.toggle("on",c.dataset.mode==='plan'));
+  $("msg").placeholder=PH['plan']||'Describe a goal…';
+  const dl=o.deadline?` (deadline: ${o.deadline.slice(0,10)})`:'';
+  $("msg").value=`Apply for / work on: ${esc(o.title)}${dl}`;
+  $("msg").style.height="auto"; $("msg").style.height=Math.min($("msg").scrollHeight,200)+"px";
+  $("msg").focus();
+};
+
+/* ---------- MCP flow visualizer — wraps addNova with agent chain ---------- */
+function buildFlowTrace(tools){
+  if(!tools||!tools.length) return '';
+  const nodes=['nova',...tools].map((t,i)=>{
+    const isAgent=i===0||t.includes('agent')||t.includes('planner')||t.includes('coach')||t.includes('brief');
+    return `<span class="ft-node${isAgent?' agent':''}">${esc(t)}</span>`;
+  });
+  return '<div class="flow-trace">'+nodes.join('<span class="ft-arrow">→</span>')+'</div>';
+}
+const _origAddNova=window.addNova;
+function addNova(text, tools, isErr){
+  const el=document.createElement("div"); el.className="msg nova";
+  const trace=(tools&&tools.length)?buildFlowTrace(tools):"";
+  el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova'
+    +(tools&&tools.length?' · '+tools.length+' tool'+(tools.length>1?'s':''):'')
+    +'</div>'+trace+'<div class="bubble'+(isErr?' err':'')+'">'+fmt(text)+'</div></div></div>';
+  $("stream").appendChild(el); scrollDown();
+}
+
 /* ---------- dynamic greeting (the alive opener) ---------- */
 async function loadGreeting(){
   try{ const d=await (await fetch("/api/greeting")).json(); addNova(d.greeting||"Hey — I'm Nova. What's on your mind?", []); }
@@ -464,6 +551,7 @@ async function loadGreeting(){
 loadGreeting();
 loadContext();
 loadMemory();
+loadOpportunities();
 $("msg").focus();
 </script>
 </body>
