@@ -301,8 +301,9 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             except Exception as e:
                 return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
             if not text:
-                text = ("I couldn't finish that turn — usually the Gemini free-tier daily limit "
-                        "(resets every 24h). You can also set NOVA_GEMINI_MODEL in .env.")
+                text = ("Empty response from the model — Gemini free-tier quota may be exhausted. "
+                        "It resets at midnight Pacific. You can also get a fresh API key at "
+                        "aistudio.google.com/apikey and update GEMINI_API_KEY in E:\\\\nova\\\\.env.")
             return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode, "fast": True})
 
         from ..agents.briefing_agent import build_briefing_agent
@@ -339,8 +340,10 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         if last_exc is not None:
             return JSONResponse({"error": "run_failed", "message": _friendly_error(str(last_exc))}, status_code=500)
         if not text:
-            text = ("I couldn't finish that turn. If this keeps happening, Gemini's free-tier may "
-                    "be at capacity — try the ⚡ Fast toggle, or set NOVA_GEMINI_MODEL=gemini-2.0-flash in .env.")
+            text = ("The model ran but returned no response — usually a free-tier rate limit. "
+                    "**Click ⚡ Fast** (top right) to switch to a single-call path that uses ~5× "
+                    "fewer requests. If it still fails, your quota may be exhausted for today "
+                    "(resets at midnight Pacific).")
         return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
 
     return app
