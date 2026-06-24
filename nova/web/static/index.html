@@ -546,13 +546,18 @@ function addNova(text, tools, isErr){
 /* ---------- dynamic greeting (the alive opener) ---------- */
 async function loadGreeting(){
   addThinking();
+  const ctrl = new AbortController();
+  const bail = setTimeout(() => ctrl.abort(), 4000); // never spin > 4s
   try{
-    const d=await (await fetch("/api/greeting")).json();
+    const d=await (await fetch("/api/greeting", {signal: ctrl.signal})).json();
+    clearTimeout(bail);
     $("thinking")?.remove();
     addNova(d.greeting||"Hey — I'm Nova. What's on your mind?", []);
   }catch(e){
+    clearTimeout(bail);
     $("thinking")?.remove();
-    addNova("Hey — I'm Nova, the brain of your TaskFlow. What's on your mind?", []);
+    const name = ""; // no name stored client-side at load time
+    addNova("Hey — I'm Nova. What's on your mind?", []);
   }
 }
 loadGreeting();

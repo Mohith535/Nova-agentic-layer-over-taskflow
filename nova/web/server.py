@@ -221,12 +221,16 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
     @app.get("/api/greeting")
     def greeting():
         """A warm, context-aware opener (recency + memory + today). No model call."""
+        import concurrent.futures
+        name = os.environ.get("NOVA_USER_NAME", "").strip()
+        fallback = (f"Hey {name} — I'm Nova." if name else "Hey — I'm Nova.") + \
+                   " What's on your mind?"
         try:
-            text = _greeting(tools, dd)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(_greeting, tools, dd)
+                text = fut.result(timeout=3.0)
         except Exception:
-            name = os.environ.get("NOVA_USER_NAME", "").strip()
-            text = (f"Hey {name} — I'm Nova." if name else "Hey — I'm Nova.") + \
-                   " I'm still reading your board. What's on your mind?"
+            text = fallback
         return JSONResponse({"greeting": text})
 
     @app.post("/api/task/schedule")
