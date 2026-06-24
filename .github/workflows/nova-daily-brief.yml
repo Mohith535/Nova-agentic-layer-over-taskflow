@@ -1,14 +1,25 @@
 name: Nova Daily Brief
 
-# Deployability proof. Runs Nova's read-only Briefing agent on a schedule and writes the
-# briefing into the run summary. It uses a committed, sanitized sample dataset by default, so
-# it goes green without exposing anyone's real data — point TASKFLOW_DATA_PATH at restored
-# data (or a TASKFLOW_TASKS_JSON secret) to brief on real tasks.
+# Deployability proof. Runs Nova's read-only Briefing agent and writes the output
+# into the run summary — visible at Actions → the run → Summary.
+#
+# GREEN with or without GEMINI_API_KEY:
+#   - Without the secret: prints setup instructions in the summary (no crash).
+#   - With the secret: runs a live brief and posts it to the summary.
+#
+# To enable live briefings:
+#   1. Go to Settings → Secrets and variables → Actions
+#   2. Add secret: GEMINI_API_KEY = your Gemini API key
 
 on:
   schedule:
-    - cron: "30 2 * * *" # 08:00 IST (02:30 UTC), daily
-  workflow_dispatch: {} # manual trigger — use this for the demo video
+    - cron: "30 2 * * *"    # 08:00 IST (02:30 UTC), daily
+  workflow_dispatch: {}       # manual trigger — use this for the demo video
+  push:
+    branches: [main]
+    paths:
+      - "nova/**"
+      - ".github/workflows/nova-daily-brief.yml"
 
 permissions:
   contents: read
@@ -36,9 +47,14 @@ jobs:
       - name: Nova daily brief
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Defaults to the committed sample; overridden above when a data secret is present.
           TASKFLOW_DATA_PATH: ${{ env.TASKFLOW_DATA_PATH || format('{0}/docs/sample_taskflow', github.workspace) }}
         run: |
-          echo "## Nova — your brief for $(date -u '+%Y-%m-%d')" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Nova — daily brief for $(date -u '+%Y-%m-%d')" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "**GEMINI_API_KEY not set** — add it at Settings → Secrets → Actions to enable live briefings." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Once the secret is set, push any change and this job will run a real Nova briefing." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           python -m nova brief --output markdown >> "$GITHUB_STEP_SUMMARY"
