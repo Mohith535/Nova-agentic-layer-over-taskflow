@@ -155,12 +155,15 @@ def _capture(agent, message: str) -> tuple[str, list[str]]:
 
 def _friendly_error(msg: str) -> str:
     if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-        return ("Gemini's free-tier daily quota was reached — it resets every 24h. "
-                "Try again later, or switch models by setting NOVA_GEMINI_MODEL=gemini-2.0-flash in .env.")
+        if "per_minute" in msg.lower() or "rate" in msg.lower():
+            return ("Hit the per-minute rate limit (15 req/min on free tier). "
+                    "Wait about 60 seconds and try again.")
+        return ("Gemini free-tier quota exhausted for today — resets at midnight Pacific. "
+                "If this keeps happening daily, your GitHub Actions workflow may be using the same "
+                "API key. Check E:\\nova\\.env and add a separate key, or disable the workflow.")
     if "UNAVAILABLE" in msg or "503" in msg or "high demand" in msg.lower():
         return ("Gemini is overloaded right now (free-tier gets deprioritised during peak hours). "
-                "Wait 30–60 seconds and try again, or set NOVA_GEMINI_MODEL=gemini-2.0-flash in .env "
-                "for a more available model.")
+                "Wait 30–60 seconds and try again.")
     if "DEADLINE_EXCEEDED" in msg or "504" in msg:
         return "The request timed out — Gemini was too slow. Try again, or use the ⚡ Fast toggle."
     if "API_KEY" in msg.upper() or "authentication" in msg.lower():
