@@ -18,7 +18,10 @@ except Exception:  # python-dotenv optional at runtime
 
 
 def gemini_model() -> str:
-    return os.environ.get("NOVA_GEMINI_MODEL", "gemini-2.5-flash")
+    # gemini-2.0-flash: stable free-tier availability, fast, supports tool use.
+    # Override with NOVA_GEMINI_MODEL=gemini-2.5-flash in .env for the latest model
+    # (higher capability but more prone to 503 overload on free tier).
+    return os.environ.get("NOVA_GEMINI_MODEL", "gemini-2.0-flash")
 
 
 def model_backend() -> str:

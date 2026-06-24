@@ -155,8 +155,16 @@ def _capture(agent, message: str) -> tuple[str, list[str]]:
 
 def _friendly_error(msg: str) -> str:
     if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-        return ("Gemini's free-tier daily limit was reached (it resets every 24h). "
-                "Try again later, or set NOVA_GEMINI_MODEL to another model in .env.")
+        return ("Gemini's free-tier daily quota was reached — it resets every 24h. "
+                "Try again later, or switch models by setting NOVA_GEMINI_MODEL=gemini-2.0-flash in .env.")
+    if "UNAVAILABLE" in msg or "503" in msg or "high demand" in msg.lower():
+        return ("Gemini is overloaded right now (free-tier gets deprioritised during peak hours). "
+                "Wait 30–60 seconds and try again, or set NOVA_GEMINI_MODEL=gemini-2.0-flash in .env "
+                "for a more available model.")
+    if "DEADLINE_EXCEEDED" in msg or "504" in msg:
+        return "The request timed out — Gemini was too slow. Try again, or use the ⚡ Fast toggle."
+    if "API_KEY" in msg.upper() or "authentication" in msg.lower():
+        return "API key issue — check that GEMINI_API_KEY is set correctly in E:\\nova\\.env."
     return msg[:300]
 
 
@@ -306,15 +314,26 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         else:
             agent, msg = build_orchestrator(dd), (msg or "What should I focus on right now?")
 
-        try:
-            text, tools_used = await run_in_threadpool(_capture, agent, msg)
-        except Exception as e:
-            return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
+        last_exc = None
+        text, tools_used = "", []
+        for attempt in range(2):  # one retry on transient overload
+            try:
+                text, tools_used = await run_in_threadpool(_capture, agent, msg)
+                last_exc = None
+                break
+            except Exception as e:
+                last_exc = e
+                err_str = str(e)
+                if attempt == 0 and ("UNAVAILABLE" in err_str or "503" in err_str):
+                    import asyncio
+                    await asyncio.sleep(3)  # brief pause before retry
+                    continue
+                break
+        if last_exc is not None:
+            return JSONResponse({"error": "run_failed", "message": _friendly_error(str(last_exc))}, status_code=500)
         if not text:
-            # Most common cause of an empty turn is the model's daily free-tier cap.
-            text = ("I couldn't finish that turn — this usually means the Gemini free-tier daily "
-                    "limit was reached (it resets every 24h). You can also set NOVA_GEMINI_MODEL "
-                    "to a different model in .env.")
+            text = ("I couldn't finish that turn. If this keeps happening, Gemini's free-tier may "
+                    "be at capacity — try the ⚡ Fast toggle, or set NOVA_GEMINI_MODEL=gemini-2.0-flash in .env.")
         return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
 
     return app
