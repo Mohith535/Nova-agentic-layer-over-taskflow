@@ -166,6 +166,9 @@ def _friendly_error(msg: str) -> str:
                 "Wait 30–60 seconds and try again.")
     if "DEADLINE_EXCEEDED" in msg or "504" in msg:
         return "The request timed out — Gemini was too slow. Try again, or use the ⚡ Fast toggle."
+    if "NOT_FOUND" in msg or "404" in msg:
+        return ("Model not found — the model name may be unsupported by the current API version. "
+                "Nova has automatically switched to a fallback model. If this persists, restart Nova.")
     if "API_KEY" in msg.upper() or "authentication" in msg.lower():
         return "API key issue — check that GEMINI_API_KEY is set correctly in E:\\nova\\.env."
     return msg[:300]

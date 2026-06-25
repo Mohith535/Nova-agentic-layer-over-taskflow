@@ -23,8 +23,8 @@ def gemini_model() -> str:
 
 
 def fast_gemini_model() -> str:
-    """Model for the single-call fast path — gemini-1.5-flash has 1500 RPD on free tier."""
-    return os.environ.get("NOVA_FAST_MODEL", "gemini-1.5-flash")
+    """Model for the single-call fast path — flash-lite: 30 RPM vs 15 RPM, works in v1beta."""
+    return os.environ.get("NOVA_FAST_MODEL", "gemini-2.0-flash-lite")
 
 
 def model_backend() -> str:
