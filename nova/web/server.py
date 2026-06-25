@@ -337,13 +337,24 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                     await asyncio.sleep(3)  # brief pause before retry
                     continue
                 break
+
+        # Auto-fallback: if ADK agent failed or returned empty, retry with the
+        # quota-frugal single-call path (works for brief/coach/ask; plan skipped).
+        if (not text or last_exc is not None) and mode in ("brief", "coach", "ask"):
+            from ..agents.fast_coach import run_fast
+            try:
+                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg)
+                last_exc = None  # fast path succeeded
+            except Exception as fe:
+                if last_exc is None:
+                    last_exc = fe
+
         if last_exc is not None:
             return JSONResponse({"error": "run_failed", "message": _friendly_error(str(last_exc))}, status_code=500)
         if not text:
-            text = ("The model ran but returned no response — usually a free-tier rate limit. "
-                    "**Click ⚡ Fast** (top right) to switch to a single-call path that uses ~5× "
-                    "fewer requests. If it still fails, your quota may be exhausted for today "
-                    "(resets at midnight Pacific).")
+            text = ("Gemini quota is exhausted for today — it resets at midnight Pacific. "
+                    "Get a fresh free key at aistudio.google.com/apikey and update "
+                    "GEMINI_API_KEY in E:\\nova\\.env, then restart Nova.")
         return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
 
     return app

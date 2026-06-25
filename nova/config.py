@@ -18,10 +18,13 @@ except Exception:  # python-dotenv optional at runtime
 
 
 def gemini_model() -> str:
-    # gemini-2.0-flash: stable free-tier availability, fast, supports tool use.
-    # Override with NOVA_GEMINI_MODEL=gemini-2.5-flash in .env for the latest model
-    # (higher capability but more prone to 503 overload on free tier).
+    """Model for the full ADK agent path — requires Gemini 2.0+ for ADK tool-calling."""
     return os.environ.get("NOVA_GEMINI_MODEL", "gemini-2.0-flash")
+
+
+def fast_gemini_model() -> str:
+    """Model for the single-call fast path — gemini-1.5-flash has 1500 RPD on free tier."""
+    return os.environ.get("NOVA_FAST_MODEL", "gemini-1.5-flash")
 
 
 def model_backend() -> str:

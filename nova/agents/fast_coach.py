@@ -7,7 +7,8 @@ real data DETERMINISTICALLY via NovaTools (zero model calls), injects it as cont
 exactly ONE generate_content call. Same grounded, emotion-aware answer; ~5x fewer requests.
 
 Used via `nova coach --fast` / `nova brief --fast`, or the "⚡ Fast" toggle in the web console.
-Plan and Ask still use the full tool-using agents (they need writes / routing).
+Ask also has a fast path (conversational with full context injected). Plan still requires the
+full agent (it needs task write access and step-by-step approval).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from ..config import gemini_model
+from ..config import fast_gemini_model
 from ..mcp.tools import NovaTools
 
 COACH_SYS = """\
@@ -71,6 +72,26 @@ def _gather_brief(t: NovaTools) -> str:
     return json.dumps(t.get_today_context().model_dump(), ensure_ascii=False, indent=2, default=str)
 
 
+def _gather_ask(t: NovaTools) -> str:
+    ctx = t.get_today_context().model_dump()
+    mem = t.recall_memory()
+    tasks = t.get_tasks()[:15]  # top 15 tasks for context
+    return json.dumps({
+        "today": ctx,
+        "tasks": tasks,
+        "what_nova_remembers": mem,
+    }, ensure_ascii=False, indent=2, default=str)
+
+
+ASK_SYS = """\
+You are Nova — an honest, grounded AI partner that knows the user's real TaskFlow data.
+You have access to their current tasks, behavioral context, and what you remember about them.
+
+Be direct and specific. Ground every response in their actual data — if you don't have enough
+info to answer confidently, say so. No cheerleading, no emoji, no invented insights.
+Meet the user's emotional tone first, then be useful. Short answers are better than long ones."""
+
+
 def run_fast(tools: NovaTools, mode: str, message: str = "", model: Optional[str] = None) -> tuple[str, list[str]]:
     """One generate_content call, grounded in deterministically-gathered data.
 
@@ -80,12 +101,17 @@ def run_fast(tools: NovaTools, mode: str, message: str = "", model: Optional[str
     from google import genai
     from google.genai import types
 
-    model = model or gemini_model()
+    model = model or fast_gemini_model()
     if mode == "coach":
         sys_inst = COACH_SYS
         data = _gather_coach(tools)
         used = ["get_behavioral_stats", "get_edit_history", "recall_memory"]
         user = message or "What pattern should I fix? Be specific."
+    elif mode == "ask":
+        sys_inst = ASK_SYS
+        data = _gather_ask(tools)
+        used = ["get_today_context", "get_tasks", "recall_memory"]
+        user = message or "What should I focus on right now?"
     else:  # brief
         sys_inst = BRIEF_SYS
         data = _gather_brief(tools)
