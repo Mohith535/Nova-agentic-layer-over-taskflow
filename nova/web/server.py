@@ -73,17 +73,27 @@ def _write_state(dd, st: dict) -> None:
 
 
 def _greeting(tools: NovaTools, dd) -> str:
-    """A warm, context-aware opener — Nova greeting you like it's been holding the thread.
-
-    Deterministic (no model call, instant, free): it weaves in how long you've been away, a
-    serious thing you last discussed (from memory), and a nudge toward today. This is the
-    'second brain that remembers you' moment — not a generic empty state.
-    """
+    """Context-aware opener — each component is independently optional so a slow
+    data source never blocks the whole greeting. No model call, always instant."""
+    import concurrent.futures as _cf
     name = os.environ.get("NOVA_USER_NAME", "").strip()
     hello = f"Hey {name}" if name else "Hey"
-    st = _read_state(dd)
     now = datetime.now()
-    days = None
+    hour = now.hour
+
+    # Time-of-day prefix
+    if 5 <= hour < 12:
+        tod = "morning"
+    elif 12 <= hour < 17:
+        tod = "afternoon"
+    elif 17 <= hour < 21:
+        tod = "evening"
+    else:
+        tod = None
+
+    # Last-seen (fast — local state file only)
+    st = _read_state(dd)
+    days: int | None = None
     if st.get("last_seen"):
         try:
             days = (now.date() - datetime.fromisoformat(st["last_seen"]).date()).days
@@ -91,36 +101,56 @@ def _greeting(tools: NovaTools, dd) -> str:
             days = None
     _write_state(dd, {**st, "last_seen": now.isoformat()})
 
-    ctx = tools.get_today_context()
-    mem = tools.recall_memory()
+    # Memory recall (fast — local JSON read)
+    try:
+        mem = tools.recall_memory()
+    except Exception:
+        mem = []
     serious = next((m.get("text") for m in reversed(mem) if m.get("kind") == "emotion"), None)
 
+    # Today context (can be slow — cap at 1.5 s, skip if it times out)
+    ctx = None
+    try:
+        with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+            ctx = ex.submit(tools.get_today_context).result(timeout=1.5)
+    except Exception:
+        ctx = None
+
     parts: list[str] = []
+
+    # Opening line — personalised by recency + time of day
     if days is None:
-        parts.append(f"{hello}. I'm Nova — I hold the thread on what you're actually doing, so we can "
-                     f"pick up wherever you are.")
+        parts.append(f"{hello}. I'm Nova — I hold the thread on what you're actually doing.")
     elif days <= 0:
-        parts.append(f"{hello}, you're back.")
+        greeting_prefix = f"{hello}{', good ' + tod if tod else ''}"
+        parts.append(f"{greeting_prefix}. You're back.")
     elif days == 1:
         parts.append(f"{hello} — it's been a day. How did it go?")
     else:
-        parts.append(f"{hello} — it's been {days} days. No score-keeping; let's just pick the thread back up.")
+        parts.append(f"{hello} — it's been {days} day{'s' if days != 1 else ''}. Let's pick the thread back up.")
 
+    # Memory hook — only if something emotional was logged
     if serious:
         parts.append(f"Last time, this was weighing on you: \"{serious}\". Still there, or has it shifted?")
 
-    overdue = ctx.overdue_total or 0
-    if ctx.prime_target:
-        parts.append(f"Today, your one thing is **{ctx.prime_target.title}** — want to start there?")
-    elif overdue and ctx.overdue_candidates:
-        parts.append(f"You're carrying **{overdue}** on the backlog. The freshest worth a look is "
-                     f"**{ctx.overdue_candidates[0].title}** — want me to brief you, or just talk it through?")
-    elif overdue:
-        parts.append(f"You're carrying **{overdue}** overdue — want me to brief you on where to start?")
+    # Task nudge — only if context loaded in time
+    if ctx is not None:
+        overdue = ctx.overdue_total or 0
+        if ctx.prime_target:
+            parts.append(f"Your one thing today is **{ctx.prime_target.title}** — want to start there?")
+        elif overdue and ctx.overdue_candidates:
+            parts.append(f"You're carrying **{overdue}** on the backlog. "
+                         f"**{ctx.overdue_candidates[0].title}** is worth a look first.")
+        elif overdue:
+            parts.append(f"You've got **{overdue}** overdue. Want me to help triage?")
+        else:
+            tod_line = f"Good {tod}. " if tod and days != 0 else ""
+            parts.append(f"{tod_line}Nothing's scheduled yet — want to plan one thing?")
     else:
-        parts.append("Nothing's scheduled today — want to plan one thing, or just think out loud?")
+        if tod and days != 0:
+            parts.append(f"Good {tod}. What's on your mind?")
 
-    return " ".join(parts)
+    return " ".join(parts) if parts else f"{hello}. What's on your mind?"
 
 
 def _capture(agent, message: str) -> tuple[str, list[str]]:
