@@ -293,20 +293,25 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 {"error": "no_api_key", "message": "Set GEMINI_API_KEY in .env to use the agents."},
                 status_code=400,
             )
+        from ..config import best_model, mark_exhausted
         mode = (req.mode or "ask").lower()
         msg = (req.message or "").strip()
 
-        # Quota-frugal path: one model call, no tool round-trips (brief/coach only).
-        if req.fast and mode in ("brief", "coach"):
+        def _is_quota_err(e: str) -> bool:
+            return "RESOURCE_EXHAUSTED" in e or "429" in e
+
+        # Fast path (user toggled ⚡ or simple mode): single model call, no tool round-trips.
+        if req.fast and mode in ("brief", "coach", "ask"):
             from ..agents.fast_coach import run_fast
+            model = best_model(mode)
             try:
-                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg)
+                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg, model)
             except Exception as e:
+                if _is_quota_err(str(e)):
+                    mark_exhausted(model)
                 return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
             if not text:
-                text = ("Empty response from the model — Gemini free-tier quota may be exhausted. "
-                        "It resets at midnight Pacific. You can also get a fresh API key at "
-                        "aistudio.google.com/apikey and update GEMINI_API_KEY in E:\\\\nova\\\\.env.")
+                text = "Empty response — quota may be exhausted. Resets at midnight Pacific."
             return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode, "fast": True})
 
         from ..agents.briefing_agent import build_briefing_agent
@@ -314,20 +319,21 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         from ..agents.planning_agent import build_planning_agent
         from ..orchestrator import build_orchestrator
 
+        model = best_model(mode)
         if mode == "brief":
-            agent, msg = build_briefing_agent(tools), (msg or "Give me my briefing for right now.")
+            agent, msg = build_briefing_agent(tools, model), (msg or "Give me my briefing for right now.")
         elif mode == "coach":
-            agent, msg = build_coach_agent(tools), (msg or "What pattern should I fix? Be specific.")
+            agent, msg = build_coach_agent(tools, model), (msg or "What pattern should I fix? Be specific.")
         elif mode == "plan":
             if not msg:
                 return JSONResponse({"error": "need_goal", "message": "Enter a goal to plan."}, status_code=400)
-            agent = build_planning_agent(tools)
+            agent = build_planning_agent(tools, model)
         else:
-            agent, msg = build_orchestrator(dd), (msg or "What should I focus on right now?")
+            agent, msg = build_orchestrator(dd, model), (msg or "What should I focus on right now?")
 
         last_exc = None
         text, tools_used = "", []
-        for attempt in range(2):  # one retry on transient overload
+        for attempt in range(2):
             try:
                 text, tools_used = await run_in_threadpool(_capture, agent, msg)
                 last_exc = None
@@ -335,29 +341,34 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             except Exception as e:
                 last_exc = e
                 err_str = str(e)
+                if _is_quota_err(err_str):
+                    mark_exhausted(model)   # don't retry this model again this session
+                    break
                 if attempt == 0 and ("UNAVAILABLE" in err_str or "503" in err_str):
                     import asyncio
-                    await asyncio.sleep(3)  # brief pause before retry
+                    await asyncio.sleep(3)
                     continue
                 break
 
-        # Auto-fallback: if ADK agent failed or returned empty, retry with the
-        # quota-frugal single-call path (works for brief/coach/ask; plan skipped).
+        # Auto-fallback to fast single-call path for non-plan modes.
         if (not text or last_exc is not None) and mode in ("brief", "coach", "ask"):
             from ..agents.fast_coach import run_fast
+            fallback_model = best_model(mode)   # router picks next available after mark_exhausted
             try:
-                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg)
-                last_exc = None  # fast path succeeded
+                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg, fallback_model)
+                last_exc = None
             except Exception as fe:
+                err_str = str(fe)
+                if _is_quota_err(err_str):
+                    mark_exhausted(fallback_model)
                 if last_exc is None:
                     last_exc = fe
 
         if last_exc is not None:
             return JSONResponse({"error": "run_failed", "message": _friendly_error(str(last_exc))}, status_code=500)
         if not text:
-            text = ("Gemini quota is exhausted for today — it resets at midnight Pacific. "
-                    "Get a fresh free key at aistudio.google.com/apikey and update "
-                    "GEMINI_API_KEY in E:\\nova\\.env, then restart Nova.")
+            text = ("All available models are quota-exhausted for today. "
+                    "Resets at midnight Pacific — or get a new free key at aistudio.google.com/apikey.")
         return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
 
     return app
