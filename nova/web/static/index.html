@@ -1429,6 +1429,14 @@ function searchHistory(q){
 
 function renderHistoryList(){ searchHistory(($('histSearch')||{}).value||''); }
 
+function _sessTitle(sess){
+  // Prefer an explicit, meaningful title; otherwise derive from the first user message.
+  const t=(sess.title||'').trim();
+  if(t && !/^Session \d/i.test(t) && t!=='New chat' && t!=='Untitled chat') return t;
+  const firstUser=(sess.messages||[]).find(m=>m.role==='user' && (m.text||'').trim());
+  if(firstUser) return firstUser.text.replace(/<[^>]+>/g,' ').trim().slice(0,60);
+  return 'New chat';
+}
 function _drawHistList(sessions,q){
   const el=$('histList'); if(!el) return;
   if(!sessions.length){
@@ -1441,7 +1449,7 @@ function _drawHistList(sessions,q){
     const g=_fmtGroupDate(sess.updated_at||sess.created_at);
     if(g!==lastGroup){ html+=`<div class="hist-group-label">${esc(g)}</div>`; lastGroup=g; }
     const active=sess.id===_SESS_ID?' active':'';
-    const title=esc(sess.title||'New chat');
+    const title=esc(_sessTitle(sess));
     const meta=_fmtDate(sess.updated_at||sess.created_at);
     const count=(sess.messages||[]).length;
     html+=`<div class="hist-item${active}" onclick="loadSession('${esc(sess.id)}')">
