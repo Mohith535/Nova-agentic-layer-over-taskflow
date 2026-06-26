@@ -339,7 +339,24 @@
   #onboarding.show{opacity:1}
   #onboarding.out{opacity:0;pointer-events:none}
 
-  .ob-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0}
+  .ob-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0;position:relative}
+
+  /* Processing overlay */
+  .ob-proc-overlay{
+    display:none;position:absolute;inset:-32px -20px;border-radius:0;
+    background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:28px;
+    z-index:10;animation:obIn .4s cubic-bezier(.16,1,.3,1) both;
+  }
+  .ob-proc-overlay.show{display:flex}
+  .ob-proc-rings{position:relative;width:84px;height:84px;flex-shrink:0}
+  .ob-proc-ring{position:absolute;border-radius:50%}
+  .ob-proc-ring.r1{inset:0;border:2px solid transparent;border-top-color:var(--ai);animation:spin 2s linear infinite}
+  .ob-proc-ring.r2{inset:14px;border:1.5px solid transparent;border-right-color:var(--blue);animation:spin 1.4s linear infinite reverse}
+  .ob-proc-ring.r3{inset:26px;border:1px solid transparent;border-bottom-color:var(--amber);animation:spin 3.2s linear infinite}
+  .ob-proc-core{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#d6c2ff;font-size:20px;animation:coreGlow 2.5s ease-in-out infinite}
+  .ob-proc-msg{font-size:17px;font-weight:600;color:var(--text);text-align:center;transition:opacity .25s}
+  .ob-proc-msg.fade{opacity:0}
+  .ob-proc-sub{font-size:12px;color:var(--dim);text-align:center;letter-spacing:.5px}
 
   /* Header */
   .ob-hd{display:flex;align-items:center;gap:16px;margin-bottom:40px}
@@ -643,6 +660,18 @@
       </div>
     </div>
   </div>
+
+  <!-- Processing overlay — shown when obFinish() fires, replaces the step content -->
+  <div class="ob-proc-overlay" id="ob-proc-overlay">
+    <div class="ob-proc-rings">
+      <div class="ob-proc-ring r1"></div>
+      <div class="ob-proc-ring r2"></div>
+      <div class="ob-proc-ring r3"></div>
+      <div class="ob-proc-core">✦</div>
+    </div>
+    <div class="ob-proc-msg" id="ob-proc-msg">Reading your answers…</div>
+    <div class="ob-proc-sub">Nova is mapping your profile</div>
+  </div>
 </div>
 
 <!-- ===================== APP SHELL ===================== -->
@@ -800,8 +829,20 @@ window.obBack=function(step){
 };
 
 window.obFinish=async function(){
-  const btn=$('ob-next-7');
-  if(btn){btn.disabled=true;btn.textContent='One moment…';}
+  const btn=$('ob-next-7'); if(btn){btn.disabled=true;}
+  // Swap step content for animated processing overlay
+  const overlay=$('ob-proc-overlay');
+  if(overlay) overlay.classList.add('show');
+  // Cycle meaningful messages so the user feels progress, not a spinner
+  const MSGS=['Reading your answers…','Finding your patterns…','Mapping your profile…','Writing your first greeting…','Almost there…'];
+  let mi=0;
+  const msgEl=$('ob-proc-msg');
+  function cycleMsg(){
+    if(!msgEl) return;
+    msgEl.classList.add('fade');
+    setTimeout(()=>{ mi=(mi+1)%MSGS.length; msgEl.textContent=MSGS[mi]; msgEl.classList.remove('fade'); },250);
+  }
+  const msgTimer=setInterval(cycleMsg,1900);
   const payload={
     basics: OB_ANSWERS._basics||{},
     answers:{
@@ -818,6 +859,9 @@ window.obFinish=async function(){
     const d=await resp.json();
     if(d.ok){ personalGreeting=d.greeting||greetingText; profileData=d.profile||null; }
   }catch(e){}
+  clearInterval(msgTimer);
+  // Final message before the reveal
+  if(msgEl){ msgEl.classList.add('fade'); setTimeout(()=>{ msgEl.textContent='Your profile is ready ✦'; msgEl.classList.remove('fade'); },250); }
   // 1.5 s pause: the proof-of-listening moment before the first personalized greeting
   setTimeout(()=>{
     const ob=$('onboarding');

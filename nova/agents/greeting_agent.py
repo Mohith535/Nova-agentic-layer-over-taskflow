@@ -121,11 +121,12 @@ def generate_greeting(tools: NovaTools, model: Optional[str] = None) -> str:
             config=types.GenerateContentConfig(
                 system_instruction=GREETING_SYS,
                 temperature=0.75,
-                max_output_tokens=200,
+                max_output_tokens=320,
             ),
         )
         text = (getattr(resp, "text", None) or "").strip()
-        if text:
+        # Guard against truncated partial responses (< 6 words = clearly incomplete)
+        if text and len(text.split()) >= 6:
             return text
     except Exception:
         pass
