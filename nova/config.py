@@ -96,3 +96,42 @@ def ensure_api_key() -> bool:
 
 def data_dir() -> str | None:
     return os.environ.get("TASKFLOW_DATA_PATH")
+
+
+def ensure_data_dir() -> str:
+    """Guarantee a usable TaskFlow data directory exists — so Nova runs on a clean
+    machine with zero setup (the judge / first-run experience).
+
+    Precedence: TASKFLOW_DATA_PATH → ~/.taskflow. If the chosen directory has no
+    tasks.json yet, it's seeded from the bundled demo data (never clobbering a real
+    TaskFlow install — we only write when tasks.json is absent). Exports
+    TASKFLOW_DATA_PATH so every downstream reader resolves to the same place.
+    """
+    import json as _json
+    import shutil as _shutil
+    from pathlib import Path as _Path
+
+    explicit = os.environ.get("TASKFLOW_DATA_PATH")
+    target = _Path(explicit).expanduser() if explicit else (_Path.home() / ".taskflow")
+    target.mkdir(parents=True, exist_ok=True)
+
+    seeded = False
+    tasks = target / "tasks.json"
+    if not tasks.exists():
+        seed = _Path(__file__).resolve().parent / "seed" / "tasks.json"
+        if seed.exists():
+            _shutil.copyfile(seed, tasks)
+            seeded = True
+        else:
+            tasks.write_text("[]", encoding="utf-8")
+
+    cfg = target / "config.json"
+    if not cfg.exists():
+        cfg.write_text(_json.dumps({"nova_data_enabled": True, "first_run_complete": True},
+                                   indent=2), encoding="utf-8")
+
+    os.environ["TASKFLOW_DATA_PATH"] = str(target)
+    if seeded:
+        print(f"[nova] No TaskFlow board found — seeded demo data into {target}", flush=True)
+        print("[nova] Explore freely; install TaskFlow to point Nova at your real board.", flush=True)
+    return str(target)

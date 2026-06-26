@@ -13,9 +13,10 @@ venv/
 # Nova local audit trail + any synced TaskFlow data must never leave the machine
 nova_audit.log
 .taskflow/
-# Ignore real TaskFlow exports, but KEEP the committed sanitized demo sample.
+# Ignore real TaskFlow exports, but KEEP the committed sanitized demo samples.
 tasks.json
 !docs/sample_taskflow/tasks.json
+!nova/seed/tasks.json
 
 # OS / IDE junk
 .DS_Store

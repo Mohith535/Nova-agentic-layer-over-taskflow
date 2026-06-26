@@ -21,10 +21,6 @@ dependencies = [
     "uvicorn>=0.30",
 ]
 
-[project.optional-dependencies]
-# Fully-offline model backend — a local LLM via Ollama, for a zero-exfiltration setup.
-local = ["ollama>=0.3.0"]
-
 [project.scripts]
 nova = "nova.main:main"
 
@@ -32,4 +28,4 @@ nova = "nova.main:main"
 include = ["nova*"]
 
 [tool.setuptools.package-data]
-nova = ["web/static/*.html"]
+nova = ["web/static/*.html", "seed/*.json"]

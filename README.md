@@ -52,27 +52,36 @@
 
 ## ⚡ Quick Start
 
-```bash
-git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova
-cd nova
-python -m venv .venv && .venv\Scripts\activate      # Windows
-pip install -e .
+**One command — installs everything and opens the console with demo data loaded.**
 
-copy .env.example .env   # then open .env and add your free Gemini key
-                          # Get one (free, 30 sec): https://aistudio.google.com/apikey
+```bash
+# Windows
+git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova && cd nova && setup.bat
+```
+```bash
+# macOS / Linux
+git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova && cd nova && bash setup.sh
 ```
 
+The browser opens at **http://127.0.0.1:8765** with a sample board already loaded — **no API key needed** to explore the console, the live data grounding, and the agent architecture. (Nova self-seeds `~/.taskflow` on first run, so there's nothing to install separately.)
+
+**To turn on the live AI agents:** copy `.env.example` → `.env`, drop in a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey), ~30 sec), and restart. That's the only step that needs a key.
+
+<details>
+<summary><b>Prefer manual setup or the CLI?</b></summary>
+
 ```bash
-nova web          # ← visual console at http://127.0.0.1:8765  (start here)
+python -m venv .venv && .venv\Scripts\activate      # Windows (mac/linux: source .venv/bin/activate)
+pip install -e .
+
+nova web          # visual console at http://127.0.0.1:8765 (auto-seeds demo data)
 nova brief        # today's mission briefing from your data
 nova plan "prepare for the Microsoft Explore interview"
 nova coach        # behavioral patterns + one concrete next step
 nova ask "what's actually blocking me right now?"
-```
-
-```bash
 nova mcp --selftest   # works with no key — lists the 11 MCP tools
 ```
+</details>
 
 No accounts. No telemetry. Your task data stays on your machine — only derived, consent-gated context ever reaches Gemini.
 

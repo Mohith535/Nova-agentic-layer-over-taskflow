@@ -1,0 +1,90 @@
+[
+    {
+        "id": 1,
+        "title": "Finish the graph-algorithms set (5 mediums)",
+        "priority": "Critical",
+        "duration": "2h",
+        "deadline": "2026-06-23T18:00:00",
+        "deadline_type": "hard",
+        "scheduled_date": null,
+        "tags": ["course", "interview"],
+        "completed": false,
+        "status": "todo",
+        "postpone_count": 4,
+        "created_at": "2026-06-10T09:00:00",
+        "description": "DSA prep for the Microsoft Explore loop.",
+        "edit_history": [
+            {"timestamp": "2026-06-15T21:40:00", "field": "deadline", "old_value": "2026-06-16T18:00:00", "new_value": "2026-06-20T18:00:00", "reason_code": "B", "reason_text": "haven't been able to start it yet"},
+            {"timestamp": "2026-06-19T22:10:00", "field": "deadline", "old_value": "2026-06-20T18:00:00", "new_value": "2026-06-23T18:00:00", "reason_code": "B", "reason_text": "ran out of evening again"}
+        ]
+    },
+    {
+        "id": 2,
+        "title": "Write STAR stories for 3 failure questions",
+        "priority": "Strategic",
+        "duration": "1h",
+        "deadline": "2026-06-24T17:00:00",
+        "deadline_type": "soft",
+        "scheduled_date": null,
+        "tags": ["course", "interview"],
+        "completed": false,
+        "status": "todo",
+        "postpone_count": 2,
+        "created_at": "2026-06-12T10:00:00",
+        "description": null,
+        "edit_history": [
+            {"timestamp": "2026-06-18T20:05:00", "field": "deadline", "old_value": "2026-06-19T17:00:00", "new_value": "2026-06-24T17:00:00", "reason_code": "B", "reason_text": null}
+        ]
+    },
+    {
+        "id": 3,
+        "title": "Reply to the recruiter email",
+        "priority": "Critical",
+        "duration": "15m",
+        "deadline": "2026-06-21T12:00:00",
+        "deadline_type": "hard",
+        "scheduled_date": null,
+        "tags": ["work"],
+        "completed": false,
+        "status": "todo",
+        "postpone_count": 0,
+        "created_at": "2026-06-20T08:30:00",
+        "description": null,
+        "edit_history": []
+    },
+    {
+        "id": 4,
+        "title": "Morning gym block",
+        "priority": "Noise",
+        "duration": "1h",
+        "deadline": null,
+        "deadline_type": null,
+        "scheduled_date": null,
+        "tags": ["personal"],
+        "completed": true,
+        "status": "completed",
+        "completed_at": "2026-06-20 07:30",
+        "postpone_count": 0,
+        "created_at": "2026-06-19T22:00:00",
+        "description": null,
+        "edit_history": [
+            {"timestamp": "2026-06-20T07:30:00", "field": "status", "old_value": "todo", "new_value": "completed", "reason_code": null, "reason_text": null}
+        ]
+    },
+    {
+        "id": 5,
+        "title": "Read one chapter of the system-design book",
+        "priority": "Strategic",
+        "duration": "1h",
+        "deadline": null,
+        "deadline_type": null,
+        "scheduled_date": null,
+        "tags": ["course"],
+        "completed": false,
+        "status": "todo",
+        "postpone_count": 6,
+        "created_at": "2026-06-01T19:00:00",
+        "description": "Keeps slipping — probably too big a chunk.",
+        "edit_history": []
+    }
+]

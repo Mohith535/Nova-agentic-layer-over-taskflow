@@ -593,10 +593,18 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
+    import threading
+    import webbrowser
+
     import uvicorn
 
+    from ..config import ensure_data_dir
     from ..security.data_guard import assert_local_host
 
     assert_local_host(host)  # refuse any non-loopback bind
-    print(f"Nova console -> http://{host}:{port}  (Ctrl+C to stop)", flush=True)
+    ensure_data_dir()        # zero-config: seed demo data if there's no board yet
+    url = f"http://{host}:{port}"
+    print(f"Nova console -> {url}  (Ctrl+C to stop)", flush=True)
+    # Pop the console open once the server is up — "everything done" for first-run users.
+    threading.Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run(build_app(), host=host, port=port, log_level="warning")

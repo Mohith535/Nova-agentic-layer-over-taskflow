@@ -126,6 +126,12 @@ def main(argv=None) -> None:
     parser.add_argument("--data-dir", default=None, help="TaskFlow data dir (default: ~/.taskflow).")
     args = parser.parse_args(argv)
 
+    # Zero-config: make sure a board exists (seed demo data on a clean machine) before
+    # the reader's strict path resolution runs.
+    if not args.data_dir:
+        from ..config import ensure_data_dir
+        ensure_data_dir()
+
     srv = build_server(args.data_dir)
 
     if args.selftest:

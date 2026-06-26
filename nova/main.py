@@ -80,6 +80,8 @@ def main(argv=None) -> None:
         return
 
     if args.cmd == "web":
+        from . import config
+        config.ensure_data_dir()  # seed demo data on a clean machine so the console always runs
         from .web.server import serve
 
         serve(port=args.port)  # localhost console; needs a key only when you run an agent
@@ -99,6 +101,7 @@ def main(argv=None) -> None:
         )
         sys.exit(2)
 
+    config.ensure_data_dir()  # seed demo data on a clean machine so agents have a board to read
     from .config import data_dir
     from .mcp.tools import NovaTools
 
