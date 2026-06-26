@@ -427,7 +427,8 @@
   /* Processing overlay */
   .ob-proc-overlay{
     display:none;position:absolute;inset:-32px -20px;border-radius:0;
-    background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:28px;
+    background:radial-gradient(120% 80% at 50% 42%,color-mix(in srgb,var(--ai) 9%,var(--bg)),var(--bg) 70%);
+    flex-direction:column;align-items:center;justify-content:center;gap:26px;
     z-index:10;animation:obIn .4s cubic-bezier(.16,1,.3,1) both;
   }
   .ob-proc-overlay.show{display:flex}
@@ -436,7 +437,7 @@
   .ob-proc-ring.r1{inset:0;border:2px solid transparent;border-top-color:var(--ai);animation:spin 2s linear infinite}
   .ob-proc-ring.r2{inset:14px;border:1.5px solid transparent;border-right-color:var(--blue);animation:spin 1.4s linear infinite reverse}
   .ob-proc-ring.r3{inset:26px;border:1px solid transparent;border-bottom-color:var(--amber);animation:spin 3.2s linear infinite}
-  .ob-proc-core{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#d6c2ff;font-size:20px;animation:coreGlow 2.5s ease-in-out infinite}
+  .ob-proc-core{position:absolute;inset:29px;border-radius:50%;background:linear-gradient(135deg,#1e1540,#2d1e5e);border:1px solid color-mix(in srgb,var(--ai) 45%,transparent);display:flex;align-items:center;justify-content:center;color:#d6c2ff;font-size:15px;box-shadow:0 0 30px color-mix(in srgb,var(--ai) 50%,transparent),0 0 60px color-mix(in srgb,var(--ai) 20%,transparent);animation:coreGlow 2.5s ease-in-out infinite}
   .ob-proc-msg{font-size:17px;font-weight:600;color:var(--text);text-align:center;transition:opacity .25s}
   .ob-proc-msg.fade{opacity:0}
   .ob-proc-sub{font-size:12px;color:var(--dim);text-align:center;letter-spacing:.5px}
