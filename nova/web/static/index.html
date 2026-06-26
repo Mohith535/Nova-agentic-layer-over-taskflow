@@ -21,7 +21,7 @@
 
   /* ===================== SPLASH SCREEN ===================== */
   #splash{
-    position:fixed;inset:0;z-index:200;background:var(--bg);
+    position:fixed;inset:0;z-index:50;background:var(--bg);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;
     transition:opacity .7s ease, transform .7s ease;
   }
@@ -91,9 +91,9 @@
            background:color-mix(in srgb,var(--surface2) 80%,transparent);border:1px solid var(--border);color:var(--muted)}
 
   /* ===================== APP SHELL ===================== */
-  .app{display:flex;flex-direction:column;height:100dvh}
+  .app{display:flex;flex-direction:column;height:100dvh;position:relative;z-index:1}
   .topbar{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--border);
-          background:linear-gradient(180deg,#11161f,var(--bg));flex-shrink:0;z-index:5}
+          background:linear-gradient(180deg,#11161f,var(--bg));flex-shrink:0}
   .mark{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
         background:linear-gradient(135deg,#2a2150,#3a2d6b);border:1px solid color-mix(in srgb,var(--ai) 45%,transparent);
         box-shadow:0 0 22px color-mix(in srgb,var(--ai) 22%,transparent);color:#d6c2ff;
@@ -119,7 +119,7 @@
 
   /* modal */
   .modal-overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(6px);
-                 z-index:60;display:none;align-items:center;justify-content:center;padding:24px}
+                 z-index:30;display:none;align-items:center;justify-content:center;padding:24px}
   .modal-overlay.show{display:flex;animation:rise .2s ease both}
   .modal-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:480px;width:100%;
               padding:24px;max-height:85vh;overflow-y:auto}
@@ -330,12 +330,12 @@
   @media(max-width:900px){.rail{display:none}}
 
   /* ===================== HISTORY DRAWER ===================== */
-  .hist-backdrop{position:fixed;inset:0;z-index:149;background:rgba(0,0,0,.45);
+  .hist-backdrop{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.45);
                  backdrop-filter:blur(2px);display:none;animation:fadeIn .18s ease both}
   .hist-backdrop.open{display:block}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .hist-drawer{
-    position:fixed;top:0;left:0;bottom:0;width:300px;z-index:150;
+    position:fixed;top:0;left:0;bottom:0;width:300px;z-index:20;
     background:#0d1117;border-right:1px solid var(--border);
     display:flex;flex-direction:column;
     transform:translateX(-100%);transition:transform .28s cubic-bezier(.16,1,.3,1);
@@ -372,11 +372,11 @@
   .hist-search-empty{padding:20px 14px;text-align:center;color:var(--dim);font-size:13px}
 
   /* History button in topbar */
-  .hist-btn{background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;
+  .hist-btn{background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;font-size:16px;
             display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);
             transition:all .15s;flex-shrink:0}
   .hist-btn:hover{color:var(--text);border-color:var(--dim)}
-  .hist-btn svg{width:15px;height:15px}
+  
   .hist-btn.hist-open{color:var(--ai);border-color:color-mix(in srgb,var(--ai) 45%,transparent);background:color-mix(in srgb,var(--ai) 8%,transparent)}
 
   /* ===================== ONBOARDING OVERLAY ===================== */
@@ -384,7 +384,7 @@
      transition still works. Without this the overlay sits at opacity:0 but blocks
      ALL pointer events on every non-first session. */
   #onboarding{
-    position:fixed;inset:0;z-index:190;background:var(--bg);
+    position:fixed;inset:0;z-index:40;background:var(--bg);
     display:none;flex-direction:column;align-items:center;justify-content:center;
     padding:32px 20px;overflow-y:auto;
     opacity:0;transition:opacity .5s ease;
@@ -762,7 +762,7 @@
 <div class="app">
   <header class="topbar">
     <button class="hist-btn" id="histBtn" onclick="$('histDrawer').classList.contains('open')?closeHistory():openHistory()" title="Chat history" aria-label="Chat history">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+      &#9776;
     </button>
     <div class="mark" aria-hidden="true">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"/></svg>
@@ -815,7 +815,6 @@
     </aside>
   </div>
 
-  <div class="modal-overlay" id="modal"><div class="modal-card" id="modalCard"></div></div>
 </div>
 
 <script>
@@ -1580,5 +1579,6 @@ async function loadGreeting(){
 loadProfile();
 loadGreeting();
 </script>
+<div class="modal-overlay" id="modal"><div class="modal-card" id="modalCard"></div></div>
 </body>
 </html>
