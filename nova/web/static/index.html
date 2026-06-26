@@ -503,6 +503,24 @@
            padding:5px 12px;font-size:12px;color:var(--dim);cursor:pointer;
            font-family:var(--sans);transition:all .15s}
   .end-btn:hover{color:var(--text);border-color:color-mix(in srgb,var(--amber) 50%,transparent)}
+  /* Profile modal */
+  .pm-section-label{font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--ai);font-weight:700;margin-bottom:8px}
+  .pm-rows{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+  .prow{display:flex;gap:0;font-size:13px;padding:4px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+  .pk{width:108px;flex-shrink:0;color:var(--muted);font-size:12px}
+  .pv{color:var(--text);flex:1}
+  .pm-goal-label{font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--ai);font-weight:700;margin-bottom:6px}
+  .pm-goal{font-size:14px;color:var(--text);line-height:1.6;padding:10px 12px;background:color-mix(in srgb,var(--ai) 6%,transparent);border-radius:8px;border-left:3px solid var(--ai);margin-bottom:4px}
+  .pm-mems{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;padding-right:4px}
+  .pm-mem-item{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text);line-height:1.5}
+  .pm-mem-empty{font-size:13px;color:var(--muted);line-height:1.6;padding:8px 0}
+  /* Session rename */
+  .hi-title-wrap{display:flex;align-items:center;gap:4px;min-width:0}
+  .hi-title-wrap .hi-title{flex:1;min-width:0}
+  .hi-ren{background:none;border:none;color:var(--dim);font-size:11px;cursor:pointer;padding:1px 3px;opacity:0;transition:opacity .12s;flex-shrink:0;line-height:1}
+  .hist-item:hover .hi-ren{opacity:1}
+  .hi-ren:hover{color:var(--ai)}
+  .hi-ren-input{width:100%;background:var(--surface2);border:1px solid var(--ai);border-radius:5px;padding:3px 6px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none}
 </style>
 </head>
 <body>
@@ -794,8 +812,7 @@
       <div id="focus"><div class="rail-empty">Loading your board…</div></div>
       <div class="rail-h mt">Scout — Opportunities</div>
       <div id="opps"><div class="rail-empty">Loading scout feed…</div></div>
-      <div class="rail-h mt row"><span>What Nova remembers</span><button class="forget" id="forget" title="Erase everything Nova remembers">clear</button></div>
-      <div id="memory"><div class="rail-empty">Nothing yet.</div></div>
+      <!-- memory moved to Profile modal -->
     </aside>
   </div>
 
@@ -958,32 +975,70 @@ function pinPurpose(purpose){
   rail.insertBefore(div,rail.firstChild);
 }
 
-window.openProfileModal=function(){
+window.openProfileModal=async function(){
   const p=tools_profile||{};
   const b=p.basics||{}, n=p.nova||{};
+  const styleMap={'deadline_driven':'Deadline-driven','step_by_step':'Step-by-step','planner':'Planner','focus_defender':'Focus defender'};
+  const driveMap={'promotion':'Gain-focused','prevention':'Loss-aware','both':'Both gain and loss'};
+  const coachMap={'direct':'Direct','analytical':'Analytical','socratic':'Socratic','behavioral':'Behavioral'};
   const rows=[
-    b.name?`<tr><td>Name</td><td>${esc(b.name)}</td></tr>`:'',
-    b.pronouns?`<tr><td>Pronouns</td><td>${esc(b.pronouns)}</td></tr>`:'',
-    b.life_context?`<tr><td>Context</td><td>${esc(b.life_context)}</td></tr>`:'',
-    b.peak_hours?`<tr><td>Peak hours</td><td>${esc(b.peak_hours)}</td></tr>`:'',
-    n.work_style?`<tr><td>Work style</td><td>${esc(n.work_style.replace(/_/g,' '))}</td></tr>`:'',
-    n.coaching_style?`<tr><td>Coaching style</td><td>${esc(n.coaching_style)}</td></tr>`:'',
-    n.purpose_90d?`<tr><td style="vertical-align:top">Goal (90d)</td><td style="color:var(--ai)">${esc(n.purpose_90d)}</td></tr>`:'',
+    b.name?`<div class="prow"><div class="pk">Name</div><div class="pv">${esc(b.name)}</div></div>`:'',
+    b.pronouns?`<div class="prow"><div class="pk">Pronouns</div><div class="pv">${esc(b.pronouns)}</div></div>`:'',
+    b.life_context?`<div class="prow"><div class="pk">Context</div><div class="pv">${esc(b.life_context)}</div></div>`:'',
+    b.peak_hours?`<div class="prow"><div class="pk">Peak hours</div><div class="pv">${esc(b.peak_hours)}</div></div>`:'',
+    n.work_style?`<div class="prow"><div class="pk">Work style</div><div class="pv">${esc(styleMap[n.work_style]||n.work_style)}</div></div>`:'',
+    n.drive_type?`<div class="prow"><div class="pk">Drive</div><div class="pv">${esc(driveMap[n.drive_type]||n.drive_type)}</div></div>`:'',
+    n.coaching_style?`<div class="prow"><div class="pk">Coaching</div><div class="pv">${esc(coachMap[n.coaching_style]||n.coaching_style)}</div></div>`:'',
+    n.accountability?`<div class="prow"><div class="pk">Accountability</div><div class="pv">${esc(n.accountability)}</div></div>`:'',
   ].filter(Boolean).join('');
+  const goal=n.purpose_90d?
+    `<div class="pm-goal-label">90-Day Goal</div><div class="pm-goal">${esc(n.purpose_90d)}</div>`:'';
+  // Fetch behavioral memories
+  let memHtml='';
+  try{
+    const md=await (await fetch('/api/memory')).json();
+    const items=(md.memory||[]).slice(-15).reverse();
+    if(!md.enabled){
+      memHtml='<div class="pm-mem-empty">Memory is off. Turn it on in TaskFlow (OPERATOR M &rarr; Advanced).</div>';
+    } else if(!items.length){
+      memHtml='<div class="pm-mem-empty">No behavioral memories yet.<br>These build after our conversations — the more you talk, the sharper I get.</div>';
+    } else {
+      memHtml=items.map(x=>{
+        const k=esc(x.kind||'fact');
+        return `<div class="pm-mem-item"><span class="mem-k ${k}">${k}</span><span>${esc(x.text||'')}</span></div>`;
+      }).join('');
+    }
+  }catch(e){
+    memHtml='<div class="pm-mem-empty">Could not load memory.</div>';
+  }
+  var html=[
+    `<button class="modal-x" onclick="closeModal()">&times;</button>`,
+    `<h3>What Nova knows about you</h3>`,
+    `<div class="msub" style="margin-bottom:16px">Stored in <code>~/.taskflow/user_profile.json</code> &mdash; never leaves your machine.</div>`,
+    rows?`<div class="pm-section-label">Profile</div><div class="pm-rows">${rows}</div>`:'',
+    goal,
+    `<div class="pm-section-label" style="margin-top:18px">Behavioral Memory</div>`,
+    `<div class="pm-mems">${memHtml}</div>`,
+    `<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">`,
+    `<button class="m-btn ghost" style="flex:1" onclick="closeModal();OB_NEEDED=true;showOnboarding()">Re-run onboarding</button>`,
+    `<a class="m-btn ghost" href="/api/profile" target="_blank" rel="noopener" style="flex:1;text-align:center">Raw JSON &nearr;</a>`,
+    `<button class="m-btn danger" onclick="closeModal();_triggerForget()" style="flex:1">Erase memory</button>`,
+    `</div>`,
+  ].filter(Boolean).join('');
+  openModal(html);
+};
+window._triggerForget=function(){
   openModal(
-    '<button class="modal-x" onclick="closeModal()">×</button>'+
-    '<h3>Your Profile</h3>'+
-    '<div class="msub" style="margin-bottom:16px">Stored locally in <code>~/.taskflow/user_profile.json</code> — shared between Nova and TaskFlow.</div>'+
-    (rows?'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">'+
-     '<colgroup><col style="width:110px"><col></colgroup>'+rows+'</table>':
-     '<div class="msub" style="margin-bottom:16px">Profile not set up yet.</div>')+
-    '<div style="display:flex;gap:10px">'+
-    '<a class="m-btn primary" href="/api/profile" target="_blank" rel="noopener" style="flex:1;text-align:center">View raw JSON ↗</a>'+
-    '<button class="m-btn ghost" onclick="closeModal();OB_NEEDED=true;showOnboarding()" style="flex:1">Re-run onboarding</button>'+
-    '</div>'
+    `<button class="modal-x" onclick="closeModal()">&times;</button>`+
+    `<h3>Start fresh with Nova?</h3>`+
+    `<div class="msub">This erases everything Nova remembers from conversations &mdash; patterns, emotional notes, preferences. Your tasks in TaskFlow stay untouched; only the behavioral memory resets. Your profile (name, goal, coaching style) is kept.</div>`+
+    `<div class="modal-actions">`+
+    `<button class="m-btn ghost" onclick="closeModal()">Keep it</button>`+
+    `<button class="m-btn danger" onclick="doForget()">Erase &amp; start fresh</button>`+
+    `</div>`
   );
 };
-let tools_profile=null;  // cached after first loadProfile
+let tools_profile=null;
 
 window.endSession=async function(){
   const btn=$('endBtn');
@@ -1010,7 +1065,7 @@ function hideSplash(){
     setTimeout(()=>{
       sp.style.display='none';
       if(OB_NEEDED){ showOnboarding(); }
-      else{ addNova(greetingText,[]); updateProfilePill(); loadContext(); loadMemory(); loadOpportunities(); }
+      else{ addNova(greetingText,[]); updateProfilePill(); loadContext(); loadOpportunities(); }
     }, 700);
   }, wait);
 }
@@ -1222,7 +1277,7 @@ window.saveMemEdit=async(el)=>{
   const id=el.dataset.id; const text=el.textContent.trim(); if(!id||!text) return;
   try{ await fetch(`/api/memory/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})}); }catch(e){}
 };
-$("forget").addEventListener("click",()=>{
+var _fBtn=$("forget"); if(_fBtn) _fBtn.addEventListener("click",()=>{
   openModal(
     '<button class="modal-x" onclick="closeModal()">×</button>'+
     '<h3>Start fresh with Nova?</h3>'+
@@ -1381,7 +1436,7 @@ function _drawHistList(sessions,q){
     const count=(sess.messages||[]).length;
     html+=`<div class="hist-item${active}" onclick="loadSession('${esc(sess.id)}')">
       <div class="hi-icon">✦</div>
-      <div class="hi-body"><div class="hi-title">${title}</div><div class="hi-meta">${esc(meta)} · ${count} msg${count!==1?'s':''}</div></div>
+      <div class="hi-body"><div class="hi-title-wrap"><div class="hi-title" id="hi-t-${esc(sess.id)}">${title}</div><button class="hi-ren" onclick="startRename('${esc(sess.id)}',event)" title="Rename">&#9998;</button></div><div class="hi-meta">${esc(meta)} · ${count} msg${count!==1?'s':''}</div></div>
       <button class="hi-del" onclick="deleteSession('${esc(sess.id)}',event)" title="Delete">×</button>
     </div>`;
   });
@@ -1394,6 +1449,28 @@ function openHistory(){
   var btn=$('histBtn');
   if(btn){ btn.classList.add('hist-open'); btn.setAttribute('title','Close history'); }
   renderHistoryList();
+}
+
+function startRename(id,e){
+  e.stopPropagation();
+  var titleEl=document.getElementById('hi-t-'+id);
+  if(!titleEl) return;
+  var orig=titleEl.textContent;
+  var inp=document.createElement('input');
+  inp.className='hi-ren-input';
+  inp.value=orig;
+  titleEl.parentNode.replaceChild(inp,titleEl);
+  inp.focus(); inp.select();
+  function save(){
+    var val=inp.value.trim()||orig;
+    var s=_loadStore(); if(s[id]){s[id].title=val;_saveStore(s);}
+    renderHistoryList();
+  }
+  inp.addEventListener('blur',save);
+  inp.addEventListener('keydown',function(ev){
+    if(ev.key==='Enter'){ev.preventDefault();inp.blur();}
+    else if(ev.key==='Escape'){inp.value=orig;inp.blur();}
+  });
 }
 function closeHistory(){
   $('histDrawer').classList.remove('open');
