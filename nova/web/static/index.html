@@ -105,12 +105,19 @@
   }
   .brand b{font-size:16px;font-weight:700;letter-spacing:-.2px}
   .brand span{display:block;font-size:11.5px;color:var(--muted);margin-top:-1px}
-  .about-btn{margin-left:auto;background:transparent;border:1px solid color-mix(in srgb,var(--border) 70%,transparent);color:var(--dim);
+  @media(max-width:760px){
+    .brand span{display:none}
+    #pill{display:none}
+    .about-btn{padding:5px 10px}
+    .topbar{gap:8px;padding:10px 14px}
+  }
+  .topbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .about-btn{background:transparent;border:1px solid color-mix(in srgb,var(--border) 70%,transparent);color:var(--dim);
              font-size:11.5px;border-radius:18px;padding:5px 12px;cursor:pointer;font-family:var(--sans);
-             transition:all .15s;letter-spacing:.1px}
+             transition:all .15s;letter-spacing:.1px;white-space:nowrap}
   .about-btn:hover{color:var(--text);border-color:var(--ai);background:color-mix(in srgb,var(--ai) 5%,transparent)}
-  .pill{margin-left:10px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);
-        padding:5px 11px;border-radius:20px;display:flex;align-items:center;gap:6px}
+  .pill{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);
+        padding:5px 11px;border-radius:20px;display:flex;align-items:center;gap:6px;white-space:nowrap}
   .pill .led{width:6px;height:6px;border-radius:50%;background:var(--green);
              animation:ledPulse 2.5s ease-in-out infinite}
   @keyframes ledPulse{
@@ -271,10 +278,10 @@
   .hint b{color:var(--ai);font-weight:500}
 
   /* ===================== RAIL ===================== */
-  .rail{width:320px;flex-shrink:0;border-left:1px solid var(--border);background:#10151d;overflow-y:auto;padding:22px 18px}
+  .rail{width:320px;flex-shrink:0;border-left:1px solid var(--border);background:#10151d;overflow-y:auto;padding:24px 18px 32px}
   .rail-h{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:700}
-  .rail-h.mt{margin-top:26px}
-  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .rail-h.mt{margin-top:30px}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px}
   .tile{background:linear-gradient(160deg,var(--surface),color-mix(in srgb,var(--surface2) 60%,var(--surface)));border:1px solid var(--border);border-radius:12px;padding:14px 14px;
         transition:transform .18s,box-shadow .18s,border-color .18s;cursor:default}
   .tile:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ai) 30%,transparent);
@@ -798,10 +805,12 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"/></svg>
     </div>
     <div class="brand"><b>Nova</b><span>the brain of TaskFlow</span></div>
-    <button class="about-btn" id="aboutBtn" title="How Nova works">How Nova works</button>
-    <button class="profile-btn" id="profileBtn" title="Your profile" onclick="openProfileModal()"><span class="p-avatar" id="p-avatar">?</span><span id="profile-name-pill">Profile</span></button>
-    <button class="end-btn" id="endBtn" title="End session — Nova writes 2-3 behavioral observations to memory so tomorrow's greeting knows the thread" onclick="endSession()">End session</button>
-    <div class="pill" id="pill"><span class="led"></span> local</div>
+    <div class="topbar-actions">
+      <button class="about-btn" id="aboutBtn" title="How Nova works">How Nova works</button>
+      <button class="profile-btn" id="profileBtn" title="Your profile" onclick="openProfileModal()"><span class="p-avatar" id="p-avatar">?</span><span id="profile-name-pill">Profile</span></button>
+      <button class="end-btn" id="endBtn" title="End session — Nova writes 2-3 behavioral observations to memory so tomorrow's greeting knows the thread" onclick="endSession()">End session</button>
+      <div class="pill" id="pill"><span class="led"></span> local</div>
+    </div>
   </header>
 
   <div class="body">
@@ -839,7 +848,7 @@
       </div>
       <div class="rail-h mt">Today</div>
       <div id="focus"><div class="rail-empty">Loading your board…</div></div>
-      <div class="rail-h mt">Scout — Opportunities</div>
+      <div class="rail-h mt">Scout · Opportunities</div>
       <div id="opps"><div class="rail-empty">Loading scout feed…</div></div>
       <!-- memory moved to Profile modal -->
     </aside>
@@ -1001,11 +1010,14 @@ window.obFinish=async function(){
 
 function pinPurpose(purpose){
   const rail=document.querySelector('.rail'); if(!rail) return;
-  const div=document.createElement('div');
-  div.innerHTML='<div class="rail-h" style="margin-top:0">Your goal</div>'
-    +'<div style="background:var(--surface);border:1px solid color-mix(in srgb,var(--ai) 30%,transparent);'
-    +'border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--muted)">'
-    +esc(purpose)+'</div><div style="height:22px"></div>';
+  if($('railGoal')) return;  // pin once
+  const div=document.createElement('div'); div.id='railGoal';
+  div.style.marginBottom='30px';
+  div.innerHTML='<div class="rail-h" style="margin-top:0">⚡ Building toward</div>'
+    +'<div style="background:linear-gradient(160deg,color-mix(in srgb,var(--ai) 8%,var(--surface)),var(--surface));'
+    +'border:1px solid color-mix(in srgb,var(--ai) 32%,transparent);border-left:3px solid var(--ai);'
+    +'border-radius:11px;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--text)">'
+    +'“'+esc(purpose)+'”</div>';
   rail.insertBefore(div,rail.firstChild);
 }
 
