@@ -32,7 +32,9 @@ class NovaTools:
         self.writer = TaskFlowWriter(data_dir)
         self.audit = AuditLog(self.reader.data_dir / "nova_audit.log")
         # Memory is gated by the SAME consent toggle as the rest of the behavioral data.
-        self.memory = MemoryStore(self.reader.data_dir, enabled=self.reader.nova_data_enabled())
+        # Pass the METHOD (not its current value) so consent is re-checked live on every
+        # read/write — a runtime toggle in TaskFlow is honored without restarting Nova.
+        self.memory = MemoryStore(self.reader.data_dir, enabled=self.reader.nova_data_enabled)
 
     # ---- READ -------------------------------------------------------------
     def get_tasks(self, status: str = "active", priority: Optional[str] = None,

@@ -1736,7 +1736,7 @@ function _renderUserMsg(text,ts){
 }
 function _renderNovaMsg(text,tools,ts){
   const el=document.createElement('div'); el.className='msg nova';
-  const toolHtml=tools&&tools.length?'<div class="tools">'+tools.map(t=>`<span class="tool-chip">${esc(t)}</span>`).join('')+'</div>':'';
+  const toolHtml=(tools&&tools.length)?buildFlowTrace(tools):'';  // same styled trace as live messages
   const meta=ts?`<div class="msg-ts">${_fmtDate(ts)}</div>`:'';
   el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova'+meta+'</div>'+toolHtml+'<div class="bubble">'+fmt(text)+'</div></div>';
   $('stream').appendChild(el);

@@ -26,9 +26,24 @@ _MAX_LEN = 300
 class MemoryStore:
     FILE = "nova_memory.json"
 
-    def __init__(self, data_dir, enabled: bool = True) -> None:
+    def __init__(self, data_dir, enabled=True) -> None:
+        """`enabled` may be a bool OR a zero-arg callable. A callable is resolved live on
+        every access, so a runtime toggle of TaskFlow's `nova_data_enabled` is honored
+        immediately — otherwise consent would be frozen at the server-start value."""
         self.path = Path(data_dir) / self.FILE
-        self.enabled = bool(enabled)
+        self._enabled = enabled
+
+    @property
+    def enabled(self) -> bool:
+        e = self._enabled
+        try:
+            return bool(e() if callable(e) else e)
+        except Exception:
+            return True
+
+    @enabled.setter
+    def enabled(self, value) -> None:
+        self._enabled = value
 
     # ---- io ----
     def _load(self) -> list[dict]:

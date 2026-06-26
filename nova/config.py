@@ -84,10 +84,6 @@ def fast_gemini_model() -> str:
     return best_model("ask")
 
 
-def model_backend() -> str:
-    return os.environ.get("NOVA_MODEL_BACKEND", "gemini").strip().lower()
-
-
 def ensure_api_key() -> bool:
     """Return True if an API key is available; mirror GEMINI_API_KEY → GOOGLE_API_KEY."""
     key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")

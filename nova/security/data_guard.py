@@ -26,12 +26,3 @@ def assert_local_host(host: str) -> str:
             f"Refusing to bind Nova to {host!r}. The MCP server is localhost-only."
         )
     return host
-
-
-def nova_consent(reader) -> bool:
-    """The behavioral-data consent gate (TaskFlow's `nova_data_enabled`). When False, the
-    agents must operate on operational data only and must not send richer context to the LLM."""
-    try:
-        return reader.nova_data_enabled()
-    except Exception:
-        return True
