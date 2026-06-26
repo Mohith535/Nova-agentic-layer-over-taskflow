@@ -546,6 +546,24 @@
   .pm-mems{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;padding-right:4px}
   .pm-mem-item{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text);line-height:1.5}
   .pm-mem-empty{font-size:13px;color:var(--muted);line-height:1.6;padding:8px 0}
+  /* Manage-your-data actions */
+  .pm-actions{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+  .pm-act{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--surface2);
+          border:1px solid var(--border);border-radius:11px;padding:11px 13px;cursor:pointer;
+          font-family:var(--sans);transition:border-color .15s,background .15s,transform .12s}
+  .pm-act:hover{border-color:color-mix(in srgb,var(--ai) 40%,transparent);background:var(--raised)}
+  .pm-act:active{transform:scale(.99)}
+  .pm-act .pm-act-t{font-size:13.5px;font-weight:600;color:var(--text)}
+  .pm-act .pm-act-d{font-size:11.5px;color:var(--muted);line-height:1.45}
+  .pm-act.danger .pm-act-t{color:var(--red)}
+  .pm-act.danger:hover{border-color:color-mix(in srgb,var(--red) 50%,transparent);
+                       background:color-mix(in srgb,var(--red) 7%,transparent)}
+  .pm-rawjson{display:inline-block;margin-top:12px;font-size:11.5px;color:var(--dim);
+              text-decoration:none;transition:color .14s}
+  .pm-rawjson:hover{color:var(--ai)}
+  .reset-list{margin:10px 0 0;padding-left:20px;font-size:13px;color:var(--muted);line-height:1.7}
+  .reset-list li{margin:3px 0}
+  .reset-list b{color:var(--text);font-weight:600}
   /* Session actions (rename + delete) */
   .hi-actions{display:flex;align-items:center;gap:2px;flex-shrink:0;opacity:0;transition:opacity .15s;margin-left:auto}
   .hist-item:hover .hi-actions{opacity:1}
@@ -1065,24 +1083,70 @@ window.openProfileModal=async function(){
     goal,
     `<div class="pm-section-label" style="margin-top:18px">Behavioral Memory</div>`,
     `<div class="pm-mems">${memHtml}</div>`,
-    `<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">`,
-    `<button class="m-btn ghost" style="flex:1" onclick="closeModal();OB_NEEDED=true;showOnboarding()">Re-run onboarding</button>`,
-    `<a class="m-btn ghost" href="/api/profile" target="_blank" rel="noopener" style="flex:1;text-align:center">Raw JSON &nearr;</a>`,
-    `<button class="m-btn danger" onclick="closeModal();_triggerForget()" style="flex:1">Erase memory</button>`,
+    `<div class="pm-section-label" style="margin-top:22px">Manage your data</div>`,
+    `<div class="pm-actions">`,
+    `<button class="pm-act" onclick="closeModal();OB_NEEDED=true;showOnboarding()">`,
+    `  <span class="pm-act-t">Re-run onboarding</span>`,
+    `  <span class="pm-act-d">Re-answer the 7 questions. Rewrites your profile — nothing is deleted.</span>`,
+    `</button>`,
+    `<button class="pm-act" onclick="confirmClearLearned()">`,
+    `  <span class="pm-act-t">Clear what Nova has learned</span>`,
+    `  <span class="pm-act-d">Wipes patterns &amp; notes Nova inferred from chats. Keeps your profile above.</span>`,
+    `</button>`,
+    `<button class="pm-act danger" onclick="confirmResetEverything()">`,
+    `  <span class="pm-act-t">Reset everything &amp; start over</span>`,
+    `  <span class="pm-act-d">Deletes your profile, learned memory, and all chat history. Begins fresh onboarding.</span>`,
+    `</button>`,
     `</div>`,
+    `<a class="pm-rawjson" href="/api/profile" target="_blank" rel="noopener">View raw profile JSON &nearr;</a>`,
   ].filter(Boolean).join('');
   openModal(html);
 };
-window._triggerForget=function(){
+window.confirmClearLearned=function(){
   openModal(
     `<button class="modal-x" onclick="closeModal()">&times;</button>`+
-    `<h3>Start fresh with Nova?</h3>`+
-    `<div class="msub">This erases everything Nova remembers from conversations &mdash; patterns, emotional notes, preferences. Your tasks in TaskFlow stay untouched; only the behavioral memory resets. Your profile (name, goal, coaching style) is kept.</div>`+
+    `<h3>Clear what Nova has learned?</h3>`+
+    `<div class="msub">This removes the patterns and emotional notes Nova has inferred from your past conversations. <b style="color:var(--text)">Your profile</b> (name, goal, work style) and your chat history stay exactly as they are. Tasks in TaskFlow are untouched.</div>`+
     `<div class="modal-actions">`+
     `<button class="m-btn ghost" onclick="closeModal()">Keep it</button>`+
-    `<button class="m-btn danger" onclick="doForget()">Erase &amp; start fresh</button>`+
+    `<button class="m-btn danger" onclick="doClearLearned()">Clear learned memory</button>`+
     `</div>`
   );
+};
+window.doClearLearned=async function(){
+  let n=0;
+  try{ const d=await (await fetch('/api/memory',{method:'DELETE'})).json(); n=d.cleared||0; }catch(e){}
+  closeModal();
+  addNova(n>0
+    ? `Cleared **${n}** learned ${n===1?'note':'notes'}. I still know who you are from your profile — just starting clean on what I'd picked up.`
+    : `There was nothing learned yet to clear — I haven't picked up patterns from our chats so far. Your profile is intact.`,
+  []);
+};
+window.confirmResetEverything=function(){
+  openModal(
+    `<button class="modal-x" onclick="closeModal()">&times;</button>`+
+    `<h3>Reset everything and start over?</h3>`+
+    `<div class="msub">This is a full clean slate. It permanently deletes:</div>`+
+    `<ul class="reset-list">`+
+    `<li><b>Your profile</b> — name, goal, work style, all 7 answers</li>`+
+    `<li><b>Learned memory</b> — every pattern and note from past chats</li>`+
+    `<li><b>All chat history</b> — every conversation in the sidebar</li>`+
+    `</ul>`+
+    `<div class="msub" style="margin-top:12px">Your tasks in TaskFlow are <b style="color:var(--text)">not</b> affected. This cannot be undone — you'll go through onboarding again.</div>`+
+    `<div class="modal-actions">`+
+    `<button class="m-btn ghost" onclick="closeModal()">Cancel</button>`+
+    `<button class="m-btn danger" onclick="doResetEverything()">Delete everything &amp; restart</button>`+
+    `</div>`
+  );
+};
+window.doResetEverything=async function(){
+  try{ await fetch('/api/reset',{method:'POST'}); }catch(e){}
+  // Wipe client-side chat transcripts + current session
+  try{ localStorage.removeItem(HIST_KEY); localStorage.removeItem(HIST_CUR); }catch(e){}
+  _SESS_ID=null;
+  closeModal();
+  // Hard reload so every in-memory cache (profile, greeting, rail) rebuilds from zero
+  setTimeout(()=>location.reload(), 150);
 };
 let tools_profile=null;
 
@@ -1365,12 +1429,6 @@ window.deleteMemEntry=async(id)=>{
 window.saveMemEdit=async(el)=>{
   const id=el.dataset.id; const text=el.textContent.trim(); if(!id||!text) return;
   try{ await fetch(`/api/memory/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})}); }catch(e){}
-};
-// forget button removed (now in profile modal)
-window.doForget=async()=>{
-  try{ await fetch("/api/memory",{method:"DELETE"}); }catch(e){}
-  closeModal();
-  addNova("Done — clean slate. Nothing you said before will color what I say next. Whenever you’re ready, we start from zero.",[]);
 };
 
 /* ===================== CHAT HISTORY (localStorage) ===================== */

@@ -252,8 +252,17 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
 
     @app.delete("/api/memory")
     def forget():
-        """Erase everything Nova remembers — the user's one-click right to be forgotten."""
+        """Clear learned behavioral memory only — keeps the user's profile intact."""
         return JSONResponse({"cleared": tools.forget_all()})
+
+    @app.post("/api/reset")
+    def reset_everything():
+        """Full start-over: delete learned memory AND the psychological profile.
+        Returns honest counts so the UI can report exactly what was removed.
+        (Chat transcripts live in browser localStorage and are cleared client-side.)"""
+        cleared = tools.forget_all()
+        had_profile = tools.reset_profile()
+        return JSONResponse({"ok": True, "memory_cleared": cleared, "profile_removed": had_profile})
 
     @app.delete("/api/memory/{entry_id}")
     def forget_one(entry_id: int):

@@ -295,6 +295,23 @@ class NovaTools:
         self.audit.record("write_user_profile", {"fields": list(updates.keys())})
         return current
 
+    def reset_profile(self) -> bool:
+        """Delete user_profile.json entirely — used by the full 'start over' reset.
+        Returns True if a profile file existed and was removed."""
+        path = self.reader.data_dir / "user_profile.json"
+        existed = path.exists()
+        try:
+            if existed:
+                path.unlink()
+            # also clear any leftover temp
+            tmp = path.with_suffix(".json.tmp")
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            return False
+        self.audit.record("reset_profile", {"existed": existed})
+        return existed
+
     # ---- SESSION ACTIVITY (Reflection Agent) ----------------------------
     def get_session_activity(self, hours: int = 24) -> dict:
         """Last N hours of activity — completed, postponed, edits, focus state."""
