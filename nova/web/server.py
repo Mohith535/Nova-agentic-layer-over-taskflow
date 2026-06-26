@@ -66,6 +66,11 @@ class ProfileCompleteReq(BaseModel):
     answers: dict = {}  # q1..q5, q6_text, q7
 
 
+class ProfileImportReq(BaseModel):
+    text: str = ""
+    source: str = "other"  # chatgpt | claude | gemini | perplexity | other
+
+
 def _read_state(dd) -> dict:
     p = Path(dd) / "nova_state.json"
     try:
@@ -376,6 +381,49 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 f"Working toward: {purpose}. Let's start." if purpose else "What's on your mind?"
             )
         return JSONResponse({"ok": True, "profile": profile, "greeting": greeting_text})
+
+    @app.post("/api/profile/import")
+    async def import_profile(req: ProfileImportReq):
+        """Break down a portrait the user pasted from another AI into Nova's signals.
+        Returns best-guess answers to pre-fill the 7 questions + a 'recognized' line.
+        Stores the raw import on the profile and seeds memory (Nova-gated)."""
+        from datetime import datetime
+        text = (req.text or "").strip()
+        if len(text) < 20:
+            return JSONResponse({"error": "too_short",
+                                 "message": "That looks too short to read much from — paste a bit more."},
+                                status_code=400)
+        from ..agents.profile_agent import extract_import
+        try:
+            result = await run_in_threadpool(extract_import, tools, text, req.source)
+        except Exception:
+            result = {"best_guess": {}, "memory_seeds": [], "recognized": ""}
+
+        # Persist the raw import + extraction on the profile (merge — keeps any basics already saved)
+        tools.write_user_profile({"ai_import": {
+            "imported": True,
+            "source": req.source,
+            "raw_text": text[:4000],
+            "extracted": result,
+            "imported_at": datetime.now().isoformat(),
+        }})
+
+        # Seed behavioral memory — only when the user allows behavioral data
+        seeded = 0
+        if tools.reader.nova_data_enabled():
+            for s in (result.get("memory_seeds") or []):
+                txt = (s.get("text") or "").strip()
+                if txt:
+                    tools.remember(txt, s.get("kind") or "fact")
+                    seeded += 1
+
+        return JSONResponse({
+            "ok": True,
+            "guesses": result.get("best_guess") or {},
+            "recognized": result.get("recognized") or "",
+            "seeded": seeded,
+            "error": result.get("error") or "",
+        })
 
     # ---- REFLECT endpoint (Reflection Agent) ------------------------------
 

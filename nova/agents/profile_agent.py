@@ -194,6 +194,117 @@ def finalize_profile(
     return profile
 
 
+IMPORT_EXTRACT_SYS = """\
+You are analyzing a "portrait" the user obtained from another AI assistant (ChatGPT, Claude,
+Gemini, Perplexity, etc.) — their description of who the user is, how they work, and what they
+want. Extract a structured profile for a behavioral focus tool called Nova.
+
+Return ONLY valid JSON — no markdown, no commentary:
+{
+  "best_guess": {
+    "q1": "momentum|overwhelmed|behind|uncertain|steady|",
+    "q2": "deadline_driven|step_by_step|planner|focus_defender|",
+    "q3": "promotion|prevention|both|",
+    "q4": "direct|analytical|socratic|behavioral|",
+    "q5": "internal|external|momentum|deadline|",
+    "q6_text": "<their 90-day goal / what they're building — their own words if stated, else a faithful 1-2 sentence inference>",
+    "q7": "deep|standard|light|fresh|"
+  },
+  "memory_seeds": [
+    {"kind": "pattern|preference|fact|emotion", "text": "<one concrete thing worth remembering>"}
+  ],
+  "recognized": "<ONE short second-person sentence naming the single most defining thing you learned>"
+}
+
+Field meanings:
+  q1 = current relationship with the work ahead (energy_state)
+  q2 = how they start important work (work_style)
+  q3 = what drives prioritization (drive_type)
+  q4 = what helps when stuck (coaching_style)
+  q5 = what makes them follow through (accountability)
+  q6_text = the real 90-day goal underneath the to-do list (purpose)
+  q7 = how much to remember between sessions (memory_depth)
+
+Rules:
+- For q1..q5,q7: ONLY output a listed value. If the portrait gives no clear signal, use "".
+  Empty is honest — do NOT guess randomly.
+- q1 is about CURRENT state; portraits rarely reveal it — usually "".
+- q6_text: prefer the user's literal words about goals/ambition; infer faithfully only if implied.
+- memory_seeds: 3-8 concrete, specific items. No flattery, no fluff. Empty list if the portrait is thin.
+- recognized: must reference something real from the text. Never generic.
+"""
+
+
+def extract_import(tools: NovaTools, text: str, source: str = "other",
+                   model: Optional[str] = None) -> dict:
+    """Break a pasted AI portrait into Nova's structured signals.
+
+    Returns: {"best_guess": {q1..q7}, "memory_seeds": [{kind,text}], "recognized": str}
+    Never raises — returns the empty structure on any failure.
+    """
+    from google import genai
+    from google.genai import types
+    from ..config import fast_gemini_model
+
+    model = model or fast_gemini_model()
+    text = (text or "").strip()[:8000]  # cap input to protect quota
+    out = {"best_guess": {}, "memory_seeds": [], "recognized": "", "error": ""}
+    if not text:
+        return out
+
+    prompt = f"SOURCE AI: {source}\n\nPORTRAIT THE USER PASTED:\n{text}"
+    try:
+        client = genai.Client()
+        resp = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=IMPORT_EXTRACT_SYS,
+                temperature=0.2,
+                max_output_tokens=900,
+            ),
+        )
+        raw = (getattr(resp, "text", None) or "").strip()
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            parsed = json.loads(m.group(0))
+            out["best_guess"] = parsed.get("best_guess") or {}
+            out["memory_seeds"] = parsed.get("memory_seeds") or []
+            out["recognized"] = (parsed.get("recognized") or "").strip()
+    except Exception as e:
+        msg = str(e)
+        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+            out["error"] = "rate_limit"
+        elif "API_KEY" in msg.upper() or "authentication" in msg.lower():
+            out["error"] = "no_key"
+        else:
+            out["error"] = "unavailable"
+
+    # Validate enums — honest "" if the model gave something invalid/missing
+    enum_map = {
+        "q1": PROFILE_SCHEMA["energy_state"],
+        "q2": PROFILE_SCHEMA["work_style"],
+        "q3": PROFILE_SCHEMA["drive_type"],
+        "q4": PROFILE_SCHEMA["coaching_style"],
+        "q5": PROFILE_SCHEMA["accountability"],
+        "q7": PROFILE_SCHEMA["memory_depth"],
+    }
+    bg = out["best_guess"] if isinstance(out["best_guess"], dict) else {}
+    for k, valid in enum_map.items():
+        if bg.get(k) not in valid:
+            bg[k] = ""
+    bg["q6_text"] = (bg.get("q6_text") or "").strip()
+    out["best_guess"] = bg
+    # sanitize seeds
+    seeds = []
+    for s in (out["memory_seeds"] or [])[:10]:
+        if isinstance(s, dict) and (s.get("text") or "").strip():
+            seeds.append({"kind": (s.get("kind") or "fact").strip(),
+                          "text": s["text"].strip()[:300]})
+    out["memory_seeds"] = seeds
+    return out
+
+
 def _direct_map(answer: str, q_key: str) -> str:
     """If the answer is already a valid schema value or a known label, map it directly."""
     opts = Q_OPTIONS.get(q_key, [])

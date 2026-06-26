@@ -488,6 +488,35 @@
               background:color-mix(in srgb,var(--ai) 10%,transparent)}
   .ob-opt.sel::before{content:'✓ ';color:var(--ai);font-weight:600}
 
+  /* ===================== AI IMPORT (onboarding step 0.5) ===================== */
+  .imp-sources{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+  .imp-src{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+           padding:7px 14px;color:var(--muted);font-size:12.5px;font-family:var(--sans);cursor:pointer;
+           transition:all .15s}
+  .imp-src:hover{color:var(--text);border-color:var(--dim)}
+  .imp-src.on{color:#fff;background:color-mix(in srgb,var(--ai) 22%,transparent);border-color:var(--ai)}
+  .imp-block{margin-bottom:16px}
+  .imp-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;
+          font-size:12.5px;color:var(--muted);margin-bottom:7px}
+  .imp-hd b{color:var(--text);font-weight:600}
+  .imp-copy{background:color-mix(in srgb,var(--ai) 12%,transparent);
+            border:1px solid color-mix(in srgb,var(--ai) 28%,transparent);color:var(--ai);
+            border-radius:7px;padding:4px 12px;font-size:11.5px;cursor:pointer;font-family:var(--sans);
+            transition:all .15s;flex-shrink:0}
+  .imp-copy:hover{background:color-mix(in srgb,var(--ai) 22%,transparent)}
+  .imp-prompt{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+              padding:12px 14px;font-size:12.5px;line-height:1.6;color:var(--muted);
+              max-height:148px;overflow-y:auto;white-space:pre-wrap;
+              font-family:var(--mono);letter-spacing:-.1px}
+  .imp-note{font-size:11px;color:var(--dim);margin-top:7px;line-height:1.5}
+  .imp-banner{background:linear-gradient(160deg,color-mix(in srgb,var(--ai) 12%,var(--surface)),var(--surface));
+              border:1px solid color-mix(in srgb,var(--ai) 32%,transparent);border-left:3px solid var(--ai);
+              border-radius:11px;padding:12px 15px;font-size:13px;line-height:1.55;color:var(--text);
+              margin-bottom:24px;animation:rise .4s ease both}
+  .imp-banner .ib-k{font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--ai);
+                    font-weight:700;display:block;margin-bottom:4px}
+  .imp-tag{font-size:10px;color:var(--ai);font-weight:600;letter-spacing:.3px;text-transform:none}
+
   /* Purpose textarea (Q6) */
   .ob-ta{background:var(--surface);border:1px solid var(--border);border-radius:12px;
          padding:14px 16px;color:var(--text);font-size:15px;font-family:var(--sans);
@@ -631,6 +660,9 @@
       <div class="ob-dot" id="ob-d7"></div>
     </div>
 
+    <!-- Recognition banner — shown after a successful AI import -->
+    <div class="imp-banner" id="imp-banner" style="display:none"></div>
+
     <!-- Step 0: Basic Details (form) -->
     <div class="ob-step active" id="ob-s0">
       <div class="ob-q-num" style="color:var(--muted)">Getting started</div>
@@ -675,7 +707,41 @@
         </div>
       </div>
       <div class="ob-nav">
-        <button class="ob-btn-next" id="ob-next-0" onclick="obNext(0)">Continue to the real questions →</button>
+        <button class="ob-btn-next" id="ob-next-0" onclick="obNext(0)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 0.5: Bring your context (optional AI import) -->
+    <div class="ob-step" id="ob-s-import">
+      <div class="ob-q-num" style="color:var(--muted)">Optional — a head start</div>
+      <div class="ob-q" style="font-size:18px">Been talking to another AI a lot?<br>
+        <span style="font-size:14px;font-weight:400;color:var(--muted)">Bring what it already knows about you — I'll read it and pre-fill the next questions, so you just confirm. Or skip; the 7 questions work great on their own.</span>
+      </div>
+
+      <div class="imp-sources" id="imp-sources">
+        <button class="imp-src on" data-src="chatgpt" onclick="impPickSource(this)">ChatGPT</button>
+        <button class="imp-src" data-src="claude" onclick="impPickSource(this)">Claude</button>
+        <button class="imp-src" data-src="gemini" onclick="impPickSource(this)">Gemini</button>
+        <button class="imp-src" data-src="perplexity" onclick="impPickSource(this)">Perplexity</button>
+        <button class="imp-src" data-src="other" onclick="impPickSource(this)">Other</button>
+      </div>
+
+      <div class="imp-block">
+        <div class="imp-hd"><span><b>1.</b> Paste this into <b id="imp-src-name">ChatGPT</b></span>
+          <button class="imp-copy" id="imp-copy" onclick="impCopyPrompt()">Copy</button></div>
+        <div class="imp-prompt" id="imp-prompt"></div>
+      </div>
+
+      <div class="imp-block">
+        <div class="imp-hd"><span><b>2.</b> Paste what it gives you back</span></div>
+        <textarea id="imp-paste" class="ob-ta" placeholder="Paste the AI's response here…"></textarea>
+        <div class="imp-note">Processed by Nova's model to extract structure — same as your chats. Stored only on your machine.</div>
+      </div>
+
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obImportBack()">←</button>
+        <button class="ob-btn-next" id="imp-use" onclick="obImportUse()">Read it &amp; pre-fill →</button>
+        <button class="ob-skip" onclick="obImportSkip()">Skip</button>
       </div>
     </div>
 
@@ -920,6 +986,16 @@ function updateProfilePill(profile){
 
 function showOnboarding(){
   const ob = $('onboarding');
+  // Reset all step state so a re-run starts genuinely clean
+  document.querySelectorAll('#onboarding .ob-step').forEach(s=>s.classList.remove('active','back'));
+  const s0=$('ob-s0'); if(s0) s0.classList.add('active');
+  document.querySelectorAll('#onboarding .ob-opt.sel').forEach(o=>o.classList.remove('sel'));
+  document.querySelectorAll('#onboarding .imp-tag').forEach(t=>t.remove());
+  for(let i=1;i<=7;i++){ const n=$('ob-next-'+i); if(n && i!==6) n.disabled=true; }
+  const banner=$('imp-banner'); if(banner){ banner.style.display='none'; banner.innerHTML=''; }
+  const paste=$('imp-paste'); if(paste) paste.value='';
+  const pur=$('ob-purpose'); if(pur) pur.value='';
+  OB_STEP=0; IMPORT_RECOGNIZED='';
   ob.style.display = 'flex';
   requestAnimationFrame(()=> ob.classList.add('show'));
   obUpdateDots(0);
@@ -956,6 +1032,7 @@ window.obNext=function(step){
     };
     fetch('/api/profile/basics',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(OB_ANSWERS._basics)}).catch(()=>{});
+    showImportStep(); return;
   } else if(step===6){
     OB_ANSWERS.q6_text = (($('ob-purpose')||{}).value||'').trim();
   }
@@ -968,6 +1045,13 @@ window.obNext=function(step){
 };
 
 window.obBack=function(step){
+  if(step===1){ // Q1 -> back to the optional import interstitial
+    $('ob-s1').classList.remove('active');
+    $('ob-s-import').classList.add('active','back');
+    OB_STEP=0; obUpdateDots(1);
+    setTimeout(()=>$('ob-s-import').classList.remove('back'),400);
+    return;
+  }
   const cur=$('ob-s'+step), prev=$('ob-s'+(step-1));
   if(!prev) return;
   cur.classList.remove('active');
@@ -976,6 +1060,119 @@ window.obBack=function(step){
   obUpdateDots(step-1);
   setTimeout(()=>prev.classList.remove('back'),400);
 };
+
+/* ===================== AI IMPORT (step 0.5) ===================== */
+let _impSource='chatgpt';
+let IMPORT_RECOGNIZED='';
+const IMPORT_BASE="I'm setting up a new AI focus tool and want it to understand me from the start. "
+  +"Based on everything you know about me — saved memory AND patterns across our past conversations — "
+  +"write a portrait of me. Keep my own words where you can. Cover:\n"
+  +"(1) who I am and what I'm doing in life right now;\n"
+  +"(2) what I'm really trying to achieve over the next few months — the real thing, not a to-do list;\n"
+  +"(3) how I work — when I focus, how I start hard things, what makes me stall;\n"
+  +"(4) how I like to be talked to — direct, gentle, data-driven, or questioning;\n"
+  +"(5) recurring patterns, struggles, emotional themes;\n"
+  +"(6) anything else important.\n"
+  +"Output one copyable block. Don't flatter me or smooth over the unflattering parts. If you're unsure, say so.";
+const IMPORT_SUFFIX={
+  chatgpt:"\n\nInclude your saved Memory, and look beyond it to patterns across our whole chat history.",
+  claude:"\n\nInclude your memory and anything from our project conversations.",
+  gemini:"\n\nInclude your saved info and relevant past activity.",
+  perplexity:"\n\nBase this on the topics and threads I keep researching — infer what I'm working toward and how I think.",
+  other:""
+};
+const IMPORT_NAMES={chatgpt:'ChatGPT',claude:'Claude',gemini:'Gemini',perplexity:'Perplexity',other:'your AI'};
+function impPrompt(){ return IMPORT_BASE + (IMPORT_SUFFIX[_impSource]||''); }
+function impRenderPrompt(){
+  var n=$('imp-src-name'); if(n) n.textContent=IMPORT_NAMES[_impSource]||'your AI';
+  var p=$('imp-prompt'); if(p) p.textContent=impPrompt();
+}
+window.impPickSource=function(btn){
+  document.querySelectorAll('.imp-src').forEach(b=>b.classList.toggle('on',b===btn));
+  _impSource=btn.dataset.src; impRenderPrompt();
+};
+window.impCopyPrompt=function(){
+  const t=impPrompt(), b=$('imp-copy');
+  const done=()=>{ if(b){ b.textContent='Copied ✓'; setTimeout(()=>b.textContent='Copy',1600); } };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done).catch(done); }
+  else { try{ const ta=$('imp-paste'); ta.focus(); }catch(e){} done(); }
+};
+function showImportStep(){
+  $('ob-s0').classList.remove('active');
+  $('ob-s-import').classList.add('active');
+  obUpdateDots(1);
+  impRenderPrompt();
+}
+function _impGoToQ1(){
+  $('ob-s-import').classList.remove('active');
+  $('ob-s1').classList.add('active');
+  OB_STEP=1; obUpdateDots(1);
+}
+window.obImportBack=function(){
+  $('ob-s-import').classList.remove('active');
+  $('ob-s0').classList.add('active','back');
+  obUpdateDots(0);
+  setTimeout(()=>$('ob-s0').classList.remove('back'),400);
+};
+window.obImportSkip=function(){ _impGoToQ1(); };
+window.obImportUse=async function(){
+  const text=(($('imp-paste')||{}).value||'').trim();
+  if(text.length<20){ var ta=$('imp-paste'); if(ta){ta.focus();} return; }
+  const btn=$('imp-use'); const orig=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.textContent='Reading…'; }
+  let guesses={}, recognized='', err='';
+  try{
+    const r=await fetch('/api/profile/import',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text, source:_impSource})});
+    const d=await r.json();
+    if(d.ok){ guesses=d.guesses||{}; recognized=d.recognized||''; err=d.error||''; }
+  }catch(e){ err='unavailable'; }
+  const got=Object.keys(guesses).some(k=>(guesses[k]||'').trim());
+  if(btn){ btn.disabled=false; btn.textContent=orig; }
+  if(!got){
+    // Extraction yielded nothing — be honest, never trap. The raw paste IS saved server-side.
+    const why = err==='rate_limit'
+      ? "I couldn't read it right now — my model's hit its daily free-tier limit."
+      : err==='no_key'
+      ? "I couldn't read it — no AI key is set up yet."
+      : "I couldn't pull clear signals from that just now.";
+    showRecognizedBanner('');
+    const note=$('imp-paste-note-err')||document.createElement('div');
+    note.id='imp-paste-note-err'; note.className='imp-note'; note.style.color='var(--amber)';
+    note.textContent=why+" I've saved what you pasted — just answer the questions below and I'll fold it in.";
+    const blk=$('imp-paste'); if(blk&&blk.parentNode&&!$('imp-paste-note-err')) blk.parentNode.appendChild(note);
+    // brief pause so they can read it, then proceed
+    setTimeout(()=>_impGoToQ1(), 1400);
+    return;
+  }
+  applyPrefill(guesses);
+  IMPORT_RECOGNIZED=recognized;
+  showRecognizedBanner(recognized);
+  _impGoToQ1();
+};
+function applyPrefill(g){
+  g=g||{};
+  const map={1:'q1',2:'q2',3:'q3',4:'q4',5:'q5',7:'q7'};
+  for(const step in map){
+    const val=((g[map[step]])||'').trim(); if(!val) continue;
+    const opt=document.querySelector('#ob-opts-'+step+' .ob-opt[data-val="'+val+'"]');
+    if(opt){ obSel(parseInt(step,10),opt); markPrefilled(step); }
+  }
+  const pur=((g.q6_text)||'').trim();
+  if(pur){ const ta=$('ob-purpose'); if(ta){ ta.value=pur; } markPrefilled(6); }
+}
+function markPrefilled(step){
+  const s=$('ob-s'+step); if(!s) return;
+  const q=s.querySelector('.ob-q-num'); if(!q || q.querySelector('.imp-tag')) return;
+  const tag=document.createElement('span'); tag.className='imp-tag'; tag.textContent=' · pre-filled from what you shared';
+  q.appendChild(tag);
+}
+function showRecognizedBanner(text){
+  const b=$('imp-banner'); if(!b) return;
+  if(!text){ b.style.display='none'; return; }
+  b.innerHTML='<span class="ib-k">✦ I read your portrait</span>'+esc(text);
+  b.style.display='block';
+}
 
 window.obFinish=async function(){
   const btn=$('ob-next-7'); if(btn){btn.disabled=true;}
