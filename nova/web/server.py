@@ -266,11 +266,27 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
     @app.get("/api/greeting")
     def greeting():
         """Session opener — personalized via Greeting Agent when profile exists,
-        deterministic fallback otherwise. Always responds within 4 s."""
+        deterministic fallback otherwise. Always responds within 8 s."""
         import concurrent.futures as _cf
+        from datetime import datetime as _dt
         profile = tools.read_user_profile()
-        name = (profile.get("basics") or {}).get("name", "") or os.environ.get("NOVA_USER_NAME", "").strip()
-        fallback = (f"Hey {name} — I'm Nova." if name else "Hey — I'm Nova.") + " What's on your mind?"
+        basics = profile.get("basics") or {}
+        nova_p = profile.get("nova") or {}
+        name = basics.get("name", "").strip() or os.environ.get("NOVA_USER_NAME", "").strip()
+        purpose = nova_p.get("purpose_90d", "").strip()
+
+        # Build a meaningful profile-aware fallback — never falls to "Hey — I'm Nova"
+        # even when Gemini is unavailable.
+        _hour = _dt.now().hour
+        _tod = "Morning" if _hour < 12 else ("Afternoon" if _hour < 18 else "Evening")
+        if name and purpose:
+            fallback = f"{name}. Still working toward: {purpose}. What's on your mind?"
+        elif name:
+            fallback = f"{_tod}, {name}. What's on your mind?"
+        elif purpose:
+            fallback = f"Still working toward: {purpose}. What's on your mind?"
+        else:
+            fallback = f"{_tod} — what's on your mind?"
 
         if profile.get("profile_complete"):
             # Use Greeting Agent (one fast Gemini call, personalized)
@@ -279,7 +295,10 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 return generate_greeting(tools)
             try:
                 with _cf.ThreadPoolExecutor(max_workers=1) as ex:
-                    text = ex.submit(_run_greeting_agent).result(timeout=4.0)
+                    text = ex.submit(_run_greeting_agent).result(timeout=8.0)
+                # Additional guard: if the agent returned something trivially short, use fallback
+                if not text or len(text.split()) < 5:
+                    text = fallback
             except Exception:
                 text = fallback
         else:

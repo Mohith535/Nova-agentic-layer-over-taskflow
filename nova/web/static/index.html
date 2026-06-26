@@ -330,9 +330,12 @@
   @media(max-width:900px){.rail{display:none}}
 
   /* ===================== ONBOARDING OVERLAY ===================== */
+  /* display:none by default — JS sets display:flex before adding .show so the opacity
+     transition still works. Without this the overlay sits at opacity:0 but blocks
+     ALL pointer events on every non-first session. */
   #onboarding{
     position:fixed;inset:0;z-index:190;background:var(--bg);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    display:none;flex-direction:column;align-items:center;justify-content:center;
     padding:32px 20px;overflow-y:auto;
     opacity:0;transition:opacity .5s ease;
   }
