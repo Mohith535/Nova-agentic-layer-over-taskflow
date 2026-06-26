@@ -2,7 +2,7 @@
 
 # ✦ Nova — the Brain of TaskFlow
 
-### Kaggle × Google · AI Agents Capstone 2026 · Concierge Track
+### Kaggle × Google · AI Agents: Intensive Vibe Coding Capstone · Concierge Track
 
 <br/>
 
@@ -13,8 +13,8 @@
 
 <p>
   <img src="https://img.shields.io/badge/ADK-8_Agents-A371F7?style=for-the-badge&labelColor=0d1117" alt="ADK" />
-  <img src="https://img.shields.io/badge/MCP-12_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
-  <img src="https://img.shields.io/badge/100%25_Local-No_Cloud-3FB950?style=for-the-badge&labelColor=0d1117" alt="Local" />
+  <img src="https://img.shields.io/badge/MCP-11_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
+  <img src="https://img.shields.io/badge/Your_Data-Stays_Local-3FB950?style=for-the-badge&labelColor=0d1117" alt="Local" />
   <img src="https://img.shields.io/badge/Gemini-Quota--Aware-D29922?style=for-the-badge&labelColor=0d1117" alt="Gemini" />
   <img src="https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge&labelColor=0d1117" alt="MIT" />
 </p>
@@ -24,7 +24,7 @@
 <p>
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-what-nova-actually-does">What Nova Does</a> ·
-  <a href="#-the-three-agents">The Agents</a> ·
+  <a href="#-the-eight-agents">The Agents</a> ·
   <a href="#-the-web-console">Web Console</a> ·
   <a href="#-architecture">Architecture</a> ·
   <a href="#-security">Security</a>
@@ -71,10 +71,10 @@ nova ask "what's actually blocking me right now?"
 ```
 
 ```bash
-nova mcp --selftest   # works with no key — lists the 8 MCP tools
+nova mcp --selftest   # works with no key — lists the 11 MCP tools
 ```
 
-No accounts. No cloud. Your data never leaves your machine.
+No accounts. No telemetry. Your task data stays on your machine — only derived, consent-gated context ever reaches Gemini.
 
 <br/>
 
@@ -257,25 +257,39 @@ That tool-call visibility is the difference between "looks like a chatbot" and "
 
 ## 🏗️ Architecture
 
-```
-            You (natural language)
-                     │
-        ┌────────────▼─────────────┐
-        │     Nova Orchestrator     │   ADK root agent — routes by intent,
-        │   (least-privilege router)│   transfers to exactly one specialist
-        └────┬──────────┬──────────┘
-             │          │          │
-        ┌────▼───┐ ┌────▼────┐ ┌───▼─────┐
-        │Briefing│ │Planning │ │  Coach  │
-        │read-only│ │ +write  │ │read-only│
-        └────┬───┘ └────┬────┘ └───┬─────┘
-             └──────────┴──────────┘
-                        │
-              ┌─────────▼──────────┐
-              │  TaskFlow MCP server │  stdio · no network surface
-              │  8 typed tools       │  path-contained · write-audited
-              │  ~/.taskflow/ data   │
-              └──────────────────────┘
+```mermaid
+flowchart TD
+    U(["You — natural language"])
+    U --> WEB["Nova Web Console<br/>FastAPI · 127.0.0.1:8765"]
+    U --> CLI["Nova CLI<br/>brief · plan · coach · ask"]
+    WEB --> ORCH
+    CLI --> ORCH
+
+    ORCH{"Orchestrator<br/>least-privilege router"}
+    ORCH -->|"what now?"| BRIEF["Briefing · read-only"]
+    ORCH -->|"goal → tasks"| PLAN["Planning · write after confirm"]
+    ORCH -->|"why I stall?"| COACH["Coach · read-only"]
+
+    WEB -.->|onboarding| PROF["Profile"]
+    WEB -.->|session open| GREET["Greeting · 1 fast call"]
+    WEB -.->|end session| REFL["Reflection"]
+    WEB -.->|weekly| PATT["Pattern Intelligence"]
+
+    BRIEF --> TOOLS
+    PLAN --> TOOLS
+    COACH --> TOOLS
+    PROF --> TOOLS
+    GREET --> TOOLS
+    REFL --> TOOLS
+    PATT --> TOOLS
+
+    TOOLS[["NovaTools — one implementation"]]
+    TOOLS -->|in-process| DATA
+    TOOLS -->|"MCP · stdio · 11 tools"| MCPS[("MCP Server<br/>no network socket")]
+    MCPS --> DATA
+
+    DATA[("~/.taskflow<br/>tasks · memory · profile · insights")]
+    TOOLS -.->|"derived context · consent-gated"| GEM(["Gemini API"])
 ```
 
 ```
@@ -292,8 +306,8 @@ nova/
     reflection_agent.py      end-of-session field notes → memory (2-3 entries)
     pattern_agent.py         weekly behavioral analysis → nova_insights.json
   mcp/
-    server.py                MCP server over stdio — 12 tools, no socket
-    tools.py                 NovaTools: profile/session/pattern tools + original 8
+    server.py                MCP server over stdio — 11 tools, no socket
+    tools.py                 NovaTools — tool layer; 11 exposed over MCP + in-process profile/session/pattern methods
   memory/store.py            local memory across sessions (consent-gated)
   web/
     server.py                FastAPI console — profile/reflect/patterns endpoints
@@ -326,7 +340,6 @@ This is a Concierge track — security is a scored criterion, so it's enforced, 
 | **Audit trail** | Every write appended to `nova_audit.log`. |
 | **Fail-closed validation** | All write inputs routed through TaskFlow's own normalizers — nothing invalid can enter the dataset. |
 | **No secrets in code** | Gemini key from env / `.env` (gitignored). `.env.example` is the template. |
-| **Fully offline option** | `NOVA_MODEL_BACKEND=local` routes to an Ollama backend. Zero cloud calls. |
 
 Nova extends the security posture already shipped in TaskFlow v9.0.0: CSRF + Host validation, CSP, output escaping, path-traversal containment, atomic writes.
 
@@ -386,10 +399,12 @@ The workflow also runs on every push to `nova/**` — every relevant commit show
 - **Profile Agent** — 7-question psychological onboarding → normalized `user_profile.json`
 - **Reflection Agent** — end-of-session behavioral field notes → memory entries
 - **Pattern Intelligence Agent** — weekly multi-week analysis → `nova_insights.json` (Coach reads it)
-- MCP server over stdio (12 typed tools, read/write split enforced per agent)
+- MCP server over stdio (11 typed tools, read/write split enforced per agent)
 - Agent Skills standard (`.agents/skills/nova/SKILL.md` — mirrored to `.claude/`, `.antigravitycli/`)
 - Web console: animated orbital splash, live grounding strip, tool-call transparency, mode chips
 - 7-question psychological onboarding (full-screen, one question at a time, dot progress)
+- **AI Import** — optional onboarding step: paste what ChatGPT / Claude / Gemini / Perplexity already knows about you (a tailored copy-paste prompt per model); Nova extracts it and **pre-fills the 7 questions** for you to confirm
+- **Three-tier data control** — Re-run onboarding · Clear what Nova has learned (keeps profile) · Reset everything (profile + memory + chats) — each with honest, count-aware confirmations
 - Profile pill + "End session" button in the topbar — session reflection on demand
 - Personalized greeting: verbatim purpose_90d quoted back = proof of listening (McBreen & Jack, 2001)
 - Plan with human-in-the-loop confirmation (propose → edit → confirm → commit)
@@ -408,7 +423,6 @@ Nova's behavioral data collection is the foundation for a future model that trul
 - **Implementation-intention capture** — after plan confirmation: "when exactly will you start?" *(Gollwitzer d≈0.65)*
 - **Proactive daily brief** — Nova messages you before you ask
 - **Auto-reschedule intelligence** — behavioral pattern → calendar adjustment, proposed not imposed
-- **AI Import** — let users paste personality summaries from ChatGPT/Claude/Gemini into their Nova profile (with prompt templates for each AI); Nova merges the external insights into `user_profile.json`
 
 <br/>
 
@@ -422,8 +436,8 @@ Nova hits all six capstone concepts — on a foundation that is a *real shipped 
 
 | Criterion | Implementation |
 |:---|:---|
-| **Multi-agent ADK** | Orchestrator + 7 specialists (conversation + relational layer), least-privilege routing |
-| **MCP server** | 12 tools over stdio, same implementation used in-process and over the protocol |
+| **Multi-agent ADK** | Orchestrator routing to 3 least-privilege sub-agents + 4 supporting agents (8 total) — conversation + relational layers |
+| **MCP server** | 11 tools over stdio — the same implementation called in-process and over the protocol |
 | **Agent Skills** | `.agents/skills/nova/SKILL.md` — when to invoke, tools, voice, security model |
 | **Explicit security** | No network surface · path containment · honest LLM boundary · audit log · fail-closed validation |
 | **Deployability** | Daily GitHub Actions brief, green without secrets, live with `GEMINI_API_KEY` |
