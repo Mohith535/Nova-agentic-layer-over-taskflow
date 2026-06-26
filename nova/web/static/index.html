@@ -95,9 +95,9 @@
   .topbar{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);
           background:linear-gradient(180deg,rgba(17,22,31,.97),rgba(13,17,23,.94));flex-shrink:0;
           backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-  .mark{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
-        background:linear-gradient(135deg,#2a2150,#3a2d6b);border:1px solid color-mix(in srgb,var(--ai) 45%,transparent);
-        box-shadow:0 0 22px color-mix(in srgb,var(--ai) 22%,transparent);color:#d6c2ff;
+  .mark{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+        background:linear-gradient(135deg,#2a2150,#4a3080);border:1px solid color-mix(in srgb,var(--ai) 55%,transparent);
+        box-shadow:0 0 28px color-mix(in srgb,var(--ai) 35%,transparent),0 2px 8px rgba(0,0,0,.4);color:#e0d0ff;
         animation:markGlow 3s ease-in-out infinite}
   @keyframes markGlow{
     0%,100%{box-shadow:0 0 22px color-mix(in srgb,var(--ai) 22%,transparent)}
@@ -189,13 +189,14 @@
   .bubble{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
           padding:13px 16px;line-height:1.65;font-size:15px;overflow-wrap:anywhere;
           transition:box-shadow .2s}
-  .msg.nova .bubble{border-left:3px solid var(--ai);background:linear-gradient(180deg,#171d28,#141922)}
+  .msg.nova .bubble{border-left:3px solid var(--ai);background:linear-gradient(160deg,#181e2c,#12171f);border-color:color-mix(in srgb,var(--ai) 18%,var(--border))}
   .msg.nova .bubble:hover{box-shadow:0 4px 24px color-mix(in srgb,var(--ai) 10%,transparent)}
   .msg.me{flex-direction:row-reverse}
   .msg.me .body-col{display:flex;flex-direction:column;align-items:flex-end}
-  .msg.me .bubble{background:color-mix(in srgb,var(--blue) 13%,var(--surface));
-                  border-color:color-mix(in srgb,var(--blue) 30%,transparent);max-width:85%}
-  .msg.me .bubble:hover{box-shadow:0 4px 20px color-mix(in srgb,var(--blue) 15%,transparent)}
+  .msg.me .bubble{background:linear-gradient(135deg,color-mix(in srgb,var(--blue) 20%,var(--surface)),color-mix(in srgb,var(--ai) 14%,var(--surface)));
+                  border-color:color-mix(in srgb,var(--blue) 40%,transparent);max-width:85%;
+                  border-left:none;border-right:3px solid color-mix(in srgb,var(--blue) 60%,transparent)}
+  .msg.me .bubble:hover{box-shadow:0 4px 20px color-mix(in srgb,var(--blue) 18%,transparent)}
   .msg.me .who{margin-right:2px}
   .bubble p{margin:0 0 9px} .bubble p:last-child{margin:0}
   .bubble strong{color:#fff;font-weight:600}
@@ -222,9 +223,9 @@
   .composer{flex-shrink:0;border-top:1px solid var(--border);background:linear-gradient(0deg,#11161f,var(--bg));padding:12px 20px 16px}
   .composer-in{max-width:760px;margin:0 auto}
   .modes{display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap}
-  .chip{font-size:12.5px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);
-        border-radius:18px;padding:6px 13px;cursor:pointer;transition:all .15s,transform .1s;
-        display:flex;gap:7px;align-items:center;user-select:none}
+  .chip{font-size:12px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);
+        border-radius:20px;padding:7px 14px;cursor:pointer;transition:all .15s,transform .1s;
+        display:flex;gap:6px;align-items:center;user-select:none;font-weight:500}
   .chip:hover{color:var(--text);border-color:var(--dim);transform:scale(1.04)}
   .chip:active{transform:scale(0.94)}
   .chip.on{color:#fff;background:color-mix(in srgb,var(--ai) 22%,transparent);border-color:var(--ai);
@@ -236,16 +237,17 @@
 
   .inputrow{display:flex;gap:10px;align-items:flex-end;background:var(--surface);border:1px solid var(--border);
             border-radius:var(--r);padding:8px 8px 8px 14px;transition:border-color .2s,box-shadow .2s}
-  .inputrow:focus-within{border-color:color-mix(in srgb,var(--ai) 55%,transparent);
-                          box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 10%,transparent)}
+  .inputrow:focus-within{border-color:color-mix(in srgb,var(--ai) 65%,transparent);
+                          box-shadow:0 0 0 4px color-mix(in srgb,var(--ai) 12%,transparent)}
   textarea{flex:1;background:transparent;border:none;color:var(--text);font-family:var(--sans);font-size:15px;
            resize:none;outline:none;line-height:1.5;max-height:200px;padding:7px 0}
   textarea::placeholder{color:var(--dim)}
-  .send{width:38px;height:38px;flex-shrink:0;border:none;border-radius:10px;cursor:pointer;
+  .send{width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;cursor:pointer;
         display:flex;align-items:center;justify-content:center;
-        background:linear-gradient(135deg,var(--ai),#7c4ddb);color:#fff;
+        background:linear-gradient(135deg,var(--ai),#6a3ccc);color:#fff;
+        box-shadow:0 4px 16px color-mix(in srgb,var(--ai) 30%,transparent);
         transition:transform .12s,box-shadow .15s,opacity .15s}
-  .send:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 22px color-mix(in srgb,var(--ai) 45%,transparent)}
+  .send:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px color-mix(in srgb,var(--ai) 50%,transparent)}
   .send:active:not(:disabled){transform:scale(0.87)!important;box-shadow:none!important}
   .send:disabled{opacity:.4;cursor:default}
   .send svg{width:18px;height:18px}
@@ -257,10 +259,10 @@
   .rail-h{font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:700}
   .rail-h.mt{margin-top:26px}
   .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 14px;
+  .tile{background:linear-gradient(160deg,var(--surface),color-mix(in srgb,var(--surface2) 60%,var(--surface)));border:1px solid var(--border);border-radius:12px;padding:14px 14px;
         transition:transform .18s,box-shadow .18s,border-color .18s;cursor:default}
   .tile:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--ai) 30%,transparent);
-              box-shadow:0 8px 32px color-mix(in srgb,var(--ai) 12%,transparent)}
+              box-shadow:0 8px 32px color-mix(in srgb,var(--ai) 14%,transparent)}
   .tile .k{font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
   .tile .v{font-family:var(--mono);font-size:24px;margin-top:6px;font-weight:600;transition:transform .2s;letter-spacing:-.5px}
   .tile:hover .v{transform:scale(1.06)}
@@ -361,7 +363,7 @@
                     padding:16px 14px 5px;font-weight:700;position:sticky;top:0;background:#0d1117;z-index:1}
   .hist-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;
              transition:background .14s;border-radius:0;position:relative;border-left:2px solid transparent}
-  .hist-item:hover{background:color-mix(in srgb,var(--text) 3%,transparent)}
+  .hist-item:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
   .hist-item.active{background:color-mix(in srgb,var(--ai) 8%,transparent);border-left-color:var(--ai)}
   .hist-item .hi-icon{width:26px;height:26px;border-radius:7px;flex-shrink:0;
                       background:color-mix(in srgb,var(--ai) 10%,transparent);

@@ -222,8 +222,12 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
     tools = NovaTools(dd)
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
-        return (_STATIC / "index.html").read_text(encoding="utf-8")
+    def index():
+        from fastapi.responses import Response
+        content = (_STATIC / "index.html").read_text(encoding="utf-8")
+        return Response(content=content, media_type="text/html",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate",
+                                 "Pragma": "no-cache", "Expires": "0"})
 
     @app.get("/api/context")
     def context():
