@@ -54,6 +54,18 @@ class MemoryUpdateReq(BaseModel):
     text: str = ""
 
 
+class ProfileBasicsReq(BaseModel):
+    name: str = ""
+    pronouns: str = ""
+    life_context: str = ""
+    peak_hours: str = ""
+
+
+class ProfileCompleteReq(BaseModel):
+    basics: dict = {}
+    answers: dict = {}  # q1..q5, q6_text, q7
+
+
 def _read_state(dd) -> dict:
     p = Path(dd) / "nova_state.json"
     try:
@@ -253,18 +265,114 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
 
     @app.get("/api/greeting")
     def greeting():
-        """A warm, context-aware opener (recency + memory + today). No model call."""
-        import concurrent.futures
-        name = os.environ.get("NOVA_USER_NAME", "").strip()
-        fallback = (f"Hey {name} — I'm Nova." if name else "Hey — I'm Nova.") + \
-                   " What's on your mind?"
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                fut = ex.submit(_greeting, tools, dd)
-                text = fut.result(timeout=3.0)
-        except Exception:
-            text = fallback
+        """Session opener — personalized via Greeting Agent when profile exists,
+        deterministic fallback otherwise. Always responds within 4 s."""
+        import concurrent.futures as _cf
+        profile = tools.read_user_profile()
+        name = (profile.get("basics") or {}).get("name", "") or os.environ.get("NOVA_USER_NAME", "").strip()
+        fallback = (f"Hey {name} — I'm Nova." if name else "Hey — I'm Nova.") + " What's on your mind?"
+
+        if profile.get("profile_complete"):
+            # Use Greeting Agent (one fast Gemini call, personalized)
+            def _run_greeting_agent():
+                from ..agents.greeting_agent import generate_greeting
+                return generate_greeting(tools)
+            try:
+                with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+                    text = ex.submit(_run_greeting_agent).result(timeout=4.0)
+            except Exception:
+                text = fallback
+        else:
+            # Deterministic path — no model call needed, profile not set up yet
+            try:
+                with _cf.ThreadPoolExecutor(max_workers=1) as ex:
+                    text = ex.submit(_greeting, tools, dd).result(timeout=3.0)
+            except Exception:
+                text = fallback
         return JSONResponse({"greeting": text})
+
+    # ---- PROFILE endpoints ------------------------------------------------
+
+    @app.get("/api/profile")
+    def get_profile():
+        """Current user profile — drives onboarding state check on page load."""
+        return JSONResponse({"profile": tools.read_user_profile()})
+
+    @app.post("/api/profile/basics")
+    def save_basics(req: ProfileBasicsReq):
+        """Save basic details (name, pronouns, life_context, peak_hours).
+        Non-blocking — basics can be saved independently before the 7 deep questions."""
+        updated = tools.write_user_profile({
+            "basics": {
+                "name": req.name.strip(),
+                "pronouns": req.pronouns.strip(),
+                "life_context": req.life_context.strip(),
+                "peak_hours": req.peak_hours.strip(),
+            }
+        })
+        return JSONResponse({"ok": True, "profile": updated})
+
+    @app.post("/api/profile/complete")
+    async def complete_profile(req: ProfileCompleteReq):
+        """Finalize onboarding: normalize 7 Q answers via Profile Agent → write profile.
+        Returns the personalized greeting generated from the new profile."""
+        if not req.answers:
+            return JSONResponse({"error": "no_answers", "message": "Answers required."}, status_code=400)
+        from ..agents.profile_agent import finalize_profile
+        from ..agents.greeting_agent import generate_greeting
+        try:
+            profile = await run_in_threadpool(finalize_profile, tools, req.answers, req.basics)
+        except Exception as e:
+            # Fallback: write a minimal profile so the user can proceed
+            from datetime import datetime
+            profile = tools.write_user_profile({
+                "profile_complete": True,
+                "basics": req.basics,
+                "nova": {"purpose_90d": req.answers.get("q6_text", ""), "memory_depth": "deep"},
+            })
+        # Generate the first personalized greeting as proof of listening
+        greeting_text = ""
+        if ensure_api_key():
+            try:
+                greeting_text = await run_in_threadpool(generate_greeting, tools)
+            except Exception:
+                pass
+        if not greeting_text:
+            name = (profile.get("basics") or {}).get("name", "")
+            purpose = (profile.get("nova") or {}).get("purpose_90d", "")
+            greeting_text = f"Got it{', ' + name if name else ''}. " + (
+                f"Working toward: {purpose}. Let's start." if purpose else "What's on your mind?"
+            )
+        return JSONResponse({"ok": True, "profile": profile, "greeting": greeting_text})
+
+    # ---- REFLECT endpoint (Reflection Agent) ------------------------------
+
+    @app.post("/api/reflect")
+    async def reflect():
+        """Run Reflection Agent: synthesize today's session → 2-3 memory entries.
+        Non-blocking — if Gemini is unavailable, returns empty list gracefully."""
+        if not ensure_api_key():
+            return JSONResponse({"error": "no_api_key", "entries": []}, status_code=400)
+        from ..agents.reflection_agent import run_reflection
+        try:
+            entries = await run_in_threadpool(run_reflection, tools)
+        except Exception:
+            entries = []
+        return JSONResponse({"entries": entries, "count": len(entries)})
+
+    # ---- PATTERNS endpoint (Pattern Intelligence Agent) -------------------
+
+    @app.post("/api/patterns")
+    async def patterns():
+        """Run Pattern Intelligence Agent: analyze 4 weeks → write nova_insights.json."""
+        if not ensure_api_key():
+            return JSONResponse({"error": "no_api_key", "insights": []}, status_code=400)
+        from ..agents.pattern_agent import run_patterns
+        try:
+            new_insights = await run_in_threadpool(run_patterns, tools, 4)
+        except Exception as e:
+            return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
+        return JSONResponse({"insights": new_insights, "count": len(new_insights)})
 
     @app.post("/api/task/schedule")
     def schedule(req: ScheduleReq):

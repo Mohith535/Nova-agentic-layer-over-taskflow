@@ -257,3 +257,123 @@ class NovaTools:
         n = self.memory.clear()
         self.audit.record("forget_all", {"count": n})
         return n
+
+    # ---- USER PROFILE (shared by Nova + TaskFlow) -----------------------
+    def read_user_profile(self) -> dict:
+        """Read user_profile.json — the psychological profile shared by all agents."""
+        path = self.reader.data_dir / "user_profile.json"
+        if not path.exists():
+            return {}
+        try:
+            import json as _json
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def write_user_profile(self, updates: dict) -> dict:
+        """Atomically deep-merge updates into user_profile.json."""
+        import json as _json
+        path = self.reader.data_dir / "user_profile.json"
+        try:
+            current = _json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            if not isinstance(current, dict):
+                current = {}
+        except Exception:
+            current = {}
+        for k, v in updates.items():
+            if isinstance(v, dict) and isinstance(current.get(k), dict):
+                current[k] = {**current[k], **v}
+            else:
+                current[k] = v
+        current.setdefault("version", 1)
+        current["updated_at"] = datetime.now().isoformat()
+        current.setdefault("created_at", current["updated_at"])
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(_json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        self.audit.record("write_user_profile", {"fields": list(updates.keys())})
+        return current
+
+    # ---- SESSION ACTIVITY (Reflection Agent) ----------------------------
+    def get_session_activity(self, hours: int = 24) -> dict:
+        """Last N hours of activity — completed, postponed, edits, focus state."""
+        from datetime import timedelta
+        cutoff = datetime.now() - timedelta(hours=max(1, min(int(hours), 168)))
+        tasks = self.reader.load_tasks()
+
+        completed = []
+        for t in tasks:
+            if t.completed and t.completed_at:
+                try:
+                    if datetime.fromisoformat(t.completed_at[:19]) >= cutoff:
+                        completed.append({"id": t.id, "title": t.title, "priority": t.priority})
+                except Exception:
+                    pass
+
+        postponed = []
+        for t in tasks:
+            for p in reversed((t.postpone_history or [])[-3:]):
+                if not p:
+                    continue
+                try:
+                    if datetime.fromisoformat(str(p)[:19]) >= cutoff:
+                        postponed.append({"id": t.id, "title": t.title,
+                                          "postpone_count": t.postpone_count, "tags": t.tags})
+                        break
+                except Exception:
+                    pass
+
+        edits = [e.model_dump() for e in self.reader.load_edit_history(days=1)][:15]
+        focus_state = self.reader._read_json("focus_state.json", {})
+        return {
+            "period_hours": int(hours),
+            "completed_count": len(completed),
+            "completed": completed[:10],
+            "postponed_count": len(postponed),
+            "postponed": postponed[:10],
+            "edit_count": len(edits),
+            "recent_edits": edits,
+            "focus_state": focus_state,
+        }
+
+    # ---- BEHAVIORAL PATTERNS (Pattern Intelligence Agent) ---------------
+    def get_behavioral_patterns(self, weeks: int = 4) -> dict:
+        """Multi-week aggregate patterns — completion by day-of-week, chronic postponers, etc."""
+        from collections import defaultdict as _dd
+        tasks = self.reader.load_tasks()
+        stats = self.get_behavioral_stats()
+
+        by_dow: dict[str, dict] = _dd(lambda: {"completed": 0, "created": 0})
+        for t in tasks:
+            if t.created_at:
+                try:
+                    dow = datetime.fromisoformat(t.created_at[:19]).strftime("%A")
+                    by_dow[dow]["created"] += 1
+                except Exception:
+                    pass
+            if t.completed and t.completed_at:
+                try:
+                    dow = datetime.fromisoformat(t.completed_at[:19]).strftime("%A")
+                    by_dow[dow]["completed"] += 1
+                except Exception:
+                    pass
+
+        chronic = [
+            {"id": t.id, "title": t.title, "postpone_count": t.postpone_count,
+             "priority": t.priority, "tags": t.tags}
+            for t in sorted(tasks, key=lambda x: x.postpone_count, reverse=True)
+            if t.postpone_count >= 3 and t.is_active
+        ][:8]
+
+        edits = self.reader.load_edit_history(days=weeks * 7)
+        deadline_moves = [e.model_dump() for e in edits if e.field == "deadline"][:15]
+
+        return {
+            "weeks_analyzed": int(weeks),
+            "stats": stats.model_dump(),
+            "completion_by_day_of_week": dict(by_dow),
+            "chronically_postponed": chronic,
+            "recent_deadline_moves": deadline_moves,
+            "total_edit_events": len(edits),
+        }

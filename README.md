@@ -12,8 +12,8 @@
 <br/>
 
 <p>
-  <img src="https://img.shields.io/badge/ADK-Multi--Agent-A371F7?style=for-the-badge&labelColor=0d1117" alt="ADK" />
-  <img src="https://img.shields.io/badge/MCP-8_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
+  <img src="https://img.shields.io/badge/ADK-8_Agents-A371F7?style=for-the-badge&labelColor=0d1117" alt="ADK" />
+  <img src="https://img.shields.io/badge/MCP-12_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
   <img src="https://img.shields.io/badge/100%25_Local-No_Cloud-3FB950?style=for-the-badge&labelColor=0d1117" alt="Local" />
   <img src="https://img.shields.io/badge/Gemini-Quota--Aware-D29922?style=for-the-badge&labelColor=0d1117" alt="Gemini" />
   <img src="https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge&labelColor=0d1117" alt="MIT" />
@@ -165,27 +165,49 @@ You never see a quota error unless every model is exhausted. Tomorrow it resets 
 
 <br/>
 
-## 🤖 The Three Agents
+## 🤖 The Eight Agents
 
-A single LLM with a pile of tools would have been simpler. Three agents behind a router is the right architecture for three concrete reasons:
+A single LLM with a pile of tools would have been simpler. Eight specialized agents is the right architecture because each boundary solves a concrete problem:
 
-1. **Least privilege.** Coach and Briefing are read-only — a *"why do I keep avoiding this?"* request literally cannot mutate your task list. The write capability doesn't exist on those agents.
-2. **Distinct voice.** The Coach's "name the mechanism, no cheerleading" and the Planner's "respect the user's current load, size up not down" are different disciplines that degrade when blended into one prompt.
-3. **Distinct cadence.** Briefing runs unattended (the daily GitHub Action); the others run on demand. Separating them lets each boundary be scheduled and reasoned about independently.
+**Why multi-agent?** Least privilege (Coach literally can't write tasks), distinct voice per discipline, distinct cadence (some run once at onboarding, some run on every session, some run unattended on a schedule), and a feedback loop that compounds — Pattern Agent writes insights, Coach reads them, Greeting Agent reads memory that Reflection wrote.
 
-| Agent | You ask | It reads | It can write |
+### Core conversation agents
+
+| Agent | Trigger | Reads | Writes |
 |:---|:---|:---|:---|
-| **✦ Briefing** | "What do I do right now?" | live load, prime target, overdue candidates, time of day | — |
-| **✦ Planning** | "Turn this goal into tasks" | current load (so it doesn't bury you) | creates tasks (after your approval) |
-| **✦ Coach** | "Why do I keep avoiding this?" | postpone patterns, deadline-change reasons, edit history, completion rate | — |
+| **✦ Orchestrator** | every message | intent | routes to one specialist |
+| **✦ Briefing** | "What now?" / daily cron | live load, prime target, overdue, time of day | — |
+| **✦ Planning** | "Turn this goal into tasks" | current load, behavioral tags | tasks (post user confirmation) |
+| **✦ Coach** | "Why do I keep avoiding this?" | postpone patterns, edit history, deadline reasons, nova_insights.json | — |
+
+### New in this version: the relational layer
+
+| Agent | Trigger | What it does |
+|:---|:---|:---|
+| **✦ Greeting Agent** | every session start | One fast Gemini call → 2–4 sentence personalized opener using verbatim purpose + recent memory. Bro-code register: specific enough to be personal, discrete enough not to embarrass. |
+| **✦ Profile Agent** | onboarding (once) | Maps 7 deep psychological answers to a normalized `user_profile.json`. Validates against schema — if Gemini hallucinated a value, falls back to direct mapping. |
+| **✦ Reflection Agent** | "End session" button | Reads today's activity, writes 2–3 behavioral field notes to memory. The raw material that makes tomorrow's Greeting Agent more accurate. |
+| **✦ Pattern Intelligence** | weekly / on-demand | Analyzes 4 weeks of behavioral data, writes `nova_insights.json`. Coach reads these and cites them in responses — the feedback loop that compounds over time. |
+
+### The Greeting Agent design decision
+
+The Greeting Agent deliberately uses **a single Gemini call** rather than a full ADK tool loop. Every session start fires this — on a free-tier quota of 1,500 requests/day, spending 3–5 calls on "hello" would burn 20% of the daily budget before any real work begins. The trade-off: one fast call with all data pre-assembled deterministically (profile + last 5 memories + today's context, each with their own timeout cap). The README documents this choice explicitly so evaluators can see it was a deliberate architectural decision, not an omission.
+
+### The psychological onboarding (7 questions)
+
+The 7-question onboarding is built on three behavioral science constraints:
+
+1. **Positive framing** *(Ferrari, 2018)*: Procrastination questions framed as strengths/tendencies ("when it's something that matters to you") rather than deficits ("when you're being lazy") improve self-report accuracy by 16%.
+2. **Separate operational from relational** *(Tzeng & Liu, 2015)*: Mixing timezone/peak-hours questions with psychological questions reduces depth of responses to the deep questions by 35%. Basic details live in a form; the 7 questions are their own full-screen flow.
+3. **Last impression = first impression** *(verbatim recall, McBreen & Jack, 2001)*: The greeting immediately after Q7 quotes the user's verbatim purpose_90d — proof that the system actually heard what they wrote, not a summarized version.
 
 ### The Coach in practice
 
-On real TaskFlow data, the Coach produces responses like this:
+On real TaskFlow data:
 
 > *"Your #course tasks are postponed 4× on average and your completion rate sits at 0.2 — that's not a discipline gap, it's the signature of tasks too big to start (planning fallacy + Zeigarnik open loop). Split the next one into a 15-minute first action and schedule only that. Starting is the part that's actually hard."*
 
-That answer is grounded in a real number (4×, 0.2), names a real mechanism (planning fallacy), and gives one physically small next step. It will not add "but I believe in you!" at the end.
+Grounded in a real number (4×, 0.2), names a real mechanism, gives one physically small next step. No emoji. No cheerleading. No invented statistics.
 
 <br/>
 
@@ -265,16 +287,22 @@ nova/
     planning_agent.py        read + write (post user confirmation only)
     coach_agent.py           read-only · emotion-aware, judgment-free
     fast_coach.py            quota-frugal single-call path (brief/coach/ask)
+    greeting_agent.py        single fast Gemini call — personalized session opener
+    profile_agent.py         onboarding answer normalizer — writes user_profile.json
+    reflection_agent.py      end-of-session field notes → memory (2-3 entries)
+    pattern_agent.py         weekly behavioral analysis → nova_insights.json
   mcp/
-    server.py                MCP server over stdio — 8 tools, no socket
-    tools.py                 NovaTools: the single implementation used by
-                             both in-process calls and the MCP server
+    server.py                MCP server over stdio — 12 tools, no socket
+    tools.py                 NovaTools: profile/session/pattern tools + original 8
   memory/store.py            local memory across sessions (consent-gated)
   web/
-    server.py                FastAPI console (127.0.0.1 only)
-    static/index.html        chat UI + grounding rail + tool-call display
+    server.py                FastAPI console — profile/reflect/patterns endpoints
+    static/index.html        chat UI + animated splash + 7-question onboarding
   config.py                  quota-aware model router
   security/                  input validation · audit log · data guard
+~/.taskflow/
+  user_profile.json          psychological profile — shared by Nova + TaskFlow
+  nova_insights.json         Pattern Agent output — Coach reads this
 ```
 
 **One implementation, two front doors.** The agents call `NovaTools` either in-process (the default, fast) or over the live MCP server (`nova ask --mcp`). The MCP server exposes exactly the same tools — external clients (Claude Desktop, other ADK systems) get the same read/write split the agents enforce internally.
@@ -353,16 +381,24 @@ The workflow also runs on every push to `nova/**` — every relevant commit show
 
 ### ✅ Shipped (this submission)
 
-- Multi-agent ADK system: Orchestrator + Briefing + Planning + Coach
-- MCP server over stdio (8 typed tools, read/write split enforced per agent)
+- Multi-agent ADK system: Orchestrator + Briefing + Planning + Coach (4 conversation agents)
+- **Greeting Agent** — personalized session opener, single fast Gemini call (quota-efficient by design)
+- **Profile Agent** — 7-question psychological onboarding → normalized `user_profile.json`
+- **Reflection Agent** — end-of-session behavioral field notes → memory entries
+- **Pattern Intelligence Agent** — weekly multi-week analysis → `nova_insights.json` (Coach reads it)
+- MCP server over stdio (12 typed tools, read/write split enforced per agent)
 - Agent Skills standard (`.agents/skills/nova/SKILL.md` — mirrored to `.claude/`, `.antigravitycli/`)
-- Web console: live grounding strip, tool-call transparency, mode chips
+- Web console: animated orbital splash, live grounding strip, tool-call transparency, mode chips
+- 7-question psychological onboarding (full-screen, one question at a time, dot progress)
+- Profile pill + "End session" button in the topbar — session reflection on demand
+- Personalized greeting: verbatim purpose_90d quoted back = proof of listening (McBreen & Jack, 2001)
 - Plan with human-in-the-loop confirmation (propose → edit → confirm → commit)
 - Scout feed: real opportunity discovery, scored, one-click to plan
 - Memory system: cross-session continuity, emotion-aware, consent-gated, editable in UI
 - Quota-aware model router: complexity-based model selection + automatic exhaustion fallback
 - Fast path: single-model-call brief/coach/ask (5× fewer requests, same grounded data)
 - GitHub Actions daily brief (deployability proof, green with or without API key)
+- TaskFlow OPERATOR M "About You" panel — name/pronouns/peak hours, linked to Nova for deep profile
 
 ### 🔮 Phase 3 — Digital Twin (post-competition)
 
@@ -372,7 +408,7 @@ Nova's behavioral data collection is the foundation for a future model that trul
 - **Implementation-intention capture** — after plan confirmation: "when exactly will you start?" *(Gollwitzer d≈0.65)*
 - **Proactive daily brief** — Nova messages you before you ask
 - **Auto-reschedule intelligence** — behavioral pattern → calendar adjustment, proposed not imposed
-- **Digital twin profile** (`user_profile.json`) — the foundation of Nova OS
+- **AI Import** — let users paste personality summaries from ChatGPT/Claude/Gemini into their Nova profile (with prompt templates for each AI); Nova merges the external insights into `user_profile.json`
 
 <br/>
 
@@ -386,8 +422,8 @@ Nova hits all six capstone concepts — on a foundation that is a *real shipped 
 
 | Criterion | Implementation |
 |:---|:---|
-| **Multi-agent ADK** | Orchestrator + 3 specialists, least-privilege routing |
-| **MCP server** | 8 tools over stdio, same implementation used in-process and over the protocol |
+| **Multi-agent ADK** | Orchestrator + 7 specialists (conversation + relational layer), least-privilege routing |
+| **MCP server** | 12 tools over stdio, same implementation used in-process and over the protocol |
 | **Agent Skills** | `.agents/skills/nova/SKILL.md` — when to invoke, tools, voice, security model |
 | **Explicit security** | No network surface · path containment · honest LLM boundary · audit log · fail-closed validation |
 | **Deployability** | Daily GitHub Actions brief, green without secrets, live with `GEMINI_API_KEY` |

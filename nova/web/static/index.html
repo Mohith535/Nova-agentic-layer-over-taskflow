@@ -328,6 +328,108 @@
   ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#222b38;border-radius:8px;border:2px solid var(--bg)}
   ::-webkit-scrollbar-thumb:hover{background:#2c374a}
   @media(max-width:900px){.rail{display:none}}
+
+  /* ===================== ONBOARDING OVERLAY ===================== */
+  #onboarding{
+    position:fixed;inset:0;z-index:190;background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px 20px;overflow-y:auto;
+    opacity:0;transition:opacity .5s ease;
+  }
+  #onboarding.show{opacity:1}
+  #onboarding.out{opacity:0;pointer-events:none}
+
+  .ob-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;gap:0}
+
+  /* Header */
+  .ob-hd{display:flex;align-items:center;gap:16px;margin-bottom:40px}
+  .ob-mark{width:46px;height:46px;flex-shrink:0;border-radius:14px;
+           background:linear-gradient(135deg,#2a2150,#3a2d6b);
+           border:1px solid color-mix(in srgb,var(--ai) 45%,transparent);
+           display:flex;align-items:center;justify-content:center;color:#d6c2ff;font-size:22px;
+           box-shadow:0 0 30px color-mix(in srgb,var(--ai) 35%,transparent)}
+  .ob-hd-text h2{font-size:22px;font-weight:700;letter-spacing:-.3px}
+  .ob-hd-text p{font-size:13.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+
+  /* Progress dots */
+  .ob-prog{display:flex;gap:7px;margin-bottom:36px;align-items:center}
+  .ob-dot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:background .3s,transform .2s}
+  .ob-dot.done{background:color-mix(in srgb,var(--ai) 60%,transparent)}
+  .ob-dot.active{background:var(--ai);transform:scale(1.35)}
+
+  /* Steps */
+  .ob-step{display:none;flex-direction:column;gap:0;animation:obIn .35s cubic-bezier(.16,1,.3,1) both}
+  .ob-step.active{display:flex}
+  @keyframes obIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  @keyframes obBack{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+  .ob-step.back{animation:obBack .35s cubic-bezier(.16,1,.3,1) both}
+
+  /* Basics form (step 0) */
+  .ob-basics{display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
+  .ob-basics-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .ob-input,.ob-sel{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+                    padding:12px 14px;color:var(--text);font-size:14px;font-family:var(--sans);
+                    outline:none;width:100%;transition:border-color .2s,box-shadow .2s}
+  .ob-input:focus,.ob-sel:focus{border-color:var(--ai);box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 10%,transparent)}
+  .ob-sel option{background:var(--surface2)}
+  .ob-basics-label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:4px;font-weight:600}
+
+  /* Deep question steps */
+  .ob-q-num{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ai);margin-bottom:16px;font-weight:600}
+  .ob-q{font-size:19px;font-weight:600;letter-spacing:-.2px;line-height:1.4;margin-bottom:28px}
+  .ob-opts{display:flex;flex-direction:column;gap:9px;margin-bottom:28px}
+  .ob-opt{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          padding:14px 18px;text-align:left;color:var(--muted);font-size:14px;
+          cursor:pointer;font-family:var(--sans);line-height:1.5;
+          transition:border-color .18s,color .18s,background .18s,transform .14s}
+  .ob-opt:hover{border-color:color-mix(in srgb,var(--ai) 35%,transparent);color:var(--text);transform:translateX(3px)}
+  .ob-opt.sel{border-color:var(--ai);color:var(--text);
+              background:color-mix(in srgb,var(--ai) 10%,transparent)}
+  .ob-opt.sel::before{content:'✓ ';color:var(--ai);font-weight:600}
+
+  /* Purpose textarea (Q6) */
+  .ob-ta{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+         padding:14px 16px;color:var(--text);font-size:15px;font-family:var(--sans);
+         resize:vertical;outline:none;min-height:100px;width:100%;line-height:1.6;
+         transition:border-color .2s,box-shadow .2s;margin-bottom:28px}
+  .ob-ta:focus{border-color:var(--ai);box-shadow:0 0 0 3px color-mix(in srgb,var(--ai) 10%,transparent)}
+  .ob-ta::placeholder{color:var(--dim)}
+
+  /* Nav row */
+  .ob-nav{display:flex;gap:10px;align-items:center}
+  .ob-btn-next{flex:1;padding:13px;border:none;border-radius:12px;font-size:15px;font-weight:600;
+               cursor:pointer;font-family:var(--sans);
+               background:linear-gradient(135deg,var(--ai),#7c4ddb);color:#fff;
+               transition:transform .12s,box-shadow .15s,opacity .15s}
+  .ob-btn-next:hover{transform:translateY(-2px);box-shadow:0 8px 24px color-mix(in srgb,var(--ai) 40%,transparent)}
+  .ob-btn-next:active{transform:scale(0.97)}
+  .ob-btn-next:disabled{opacity:.45;cursor:default;transform:none;box-shadow:none}
+  .ob-btn-back{background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+               padding:13px 16px;color:var(--muted);font-size:14px;cursor:pointer;
+               font-family:var(--sans);transition:all .15s}
+  .ob-btn-back:hover{color:var(--text);border-color:var(--dim)}
+  .ob-skip{font-size:12px;color:var(--dim);cursor:pointer;margin-left:6px;
+           background:none;border:none;font-family:var(--sans);transition:color .14s}
+  .ob-skip:hover{color:var(--muted)}
+
+  /* Proof moment (after last Q) */
+  .ob-proof{text-align:center;padding:24px 0;animation:rise .5s ease both}
+  .ob-proof .mark-big{font-size:40px;margin-bottom:16px}
+  .ob-proof h3{font-size:20px;font-weight:700;margin-bottom:8px}
+  .ob-proof p{color:var(--muted);font-size:14px;line-height:1.6;max-width:400px;margin:0 auto}
+
+  /* Profile indicator in topbar */
+  .profile-btn{background:none;border:1px solid var(--border);border-radius:18px;
+               padding:5px 12px;font-size:12px;color:var(--muted);cursor:pointer;
+               font-family:var(--sans);transition:all .15s;display:flex;align-items:center;gap:6px}
+  .profile-btn:hover{color:var(--text);border-color:var(--ai)}
+  .profile-btn .p-name{color:var(--text);font-weight:500}
+
+  /* End-session button */
+  .end-btn{background:none;border:1px solid var(--border);border-radius:18px;
+           padding:5px 12px;font-size:12px;color:var(--dim);cursor:pointer;
+           font-family:var(--sans);transition:all .15s}
+  .end-btn:hover{color:var(--text);border-color:color-mix(in srgb,var(--amber) 50%,transparent)}
 </style>
 </head>
 <body>
@@ -362,6 +464,187 @@
   </div>
 </div>
 
+<!-- ===================== ONBOARDING OVERLAY ===================== -->
+<div id="onboarding">
+  <div class="ob-wrap">
+    <div class="ob-hd">
+      <div class="ob-mark">✦</div>
+      <div class="ob-hd-text">
+        <h2>Before we start</h2>
+        <p>I want to understand you. Not your task list. <em>You</em>.<br>Seven questions. Take your time with them.</p>
+      </div>
+    </div>
+
+    <!-- Progress dots: 0=basics, 1-7=questions -->
+    <div class="ob-prog" id="ob-prog">
+      <div class="ob-dot" id="ob-d0"></div>
+      <div class="ob-dot" id="ob-d1"></div>
+      <div class="ob-dot" id="ob-d2"></div>
+      <div class="ob-dot" id="ob-d3"></div>
+      <div class="ob-dot" id="ob-d4"></div>
+      <div class="ob-dot" id="ob-d5"></div>
+      <div class="ob-dot" id="ob-d6"></div>
+      <div class="ob-dot" id="ob-d7"></div>
+    </div>
+
+    <!-- Step 0: Basic Details (form) -->
+    <div class="ob-step active" id="ob-s0">
+      <div class="ob-q-num" style="color:var(--muted)">Getting started</div>
+      <div class="ob-q" style="font-size:17px">A few basics — just your name and context.<br><span style="font-size:14px;font-weight:400;color:var(--muted)">The real questions come next.</span></div>
+      <div class="ob-basics">
+        <div>
+          <div class="ob-basics-label">Name</div>
+          <input id="ob-name" class="ob-input" placeholder="What should I call you?" autocomplete="off">
+        </div>
+        <div class="ob-basics-row">
+          <div>
+            <div class="ob-basics-label">Pronouns</div>
+            <select id="ob-pronouns" class="ob-sel">
+              <option value="">Prefer not to say</option>
+              <option value="he/him">he/him</option>
+              <option value="she/her">she/her</option>
+              <option value="they/them">they/them</option>
+              <option value="other">other</option>
+            </select>
+          </div>
+          <div>
+            <div class="ob-basics-label">Context</div>
+            <select id="ob-context" class="ob-sel">
+              <option value="">Select…</option>
+              <option value="student">Student</option>
+              <option value="professional">Professional</option>
+              <option value="entrepreneur">Entrepreneur</option>
+              <option value="mix">Mix</option>
+            </select>
+          </div>
+          <div>
+            <div class="ob-basics-label">Peak hours</div>
+            <select id="ob-peak" class="ob-sel">
+              <option value="">Select…</option>
+              <option value="morning">Morning (6–12)</option>
+              <option value="late_morning">Late morning (10–2)</option>
+              <option value="afternoon">Afternoon (12–6)</option>
+              <option value="evening">Evening (6pm+)</option>
+              <option value="night">Night owl</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-next" id="ob-next-0" onclick="obNext(0)">Continue to the real questions →</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Energy State -->
+    <div class="ob-step" id="ob-s1">
+      <div class="ob-q-num">1 of 7</div>
+      <div class="ob-q">What's your honest relationship with the work ahead of you, right now?</div>
+      <div class="ob-opts" id="ob-opts-1">
+        <button class="ob-opt" data-val="momentum" onclick="obSel(1,this)">I have clarity and momentum. I know what to do and I'm moving.</button>
+        <button class="ob-opt" data-val="overwhelmed" onclick="obSel(1,this)">There's too much. I don't know where to start.</button>
+        <button class="ob-opt" data-val="behind" onclick="obSel(1,this)">I'm behind, and I know it. That weight is there.</button>
+        <button class="ob-opt" data-val="uncertain" onclick="obSel(1,this)">I'm running, but I'm not sure I'm working on the right things.</button>
+        <button class="ob-opt" data-val="steady" onclick="obSel(1,this)">Scattered. Too many open threads, nothing fully closed.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(1)">←</button>
+        <button class="ob-btn-next" id="ob-next-1" onclick="obNext(1)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Work Style -->
+    <div class="ob-step" id="ob-s2">
+      <div class="ob-q-num">2 of 7</div>
+      <div class="ob-q">When it comes to getting started on something that actually matters to you — what's most true?</div>
+      <div class="ob-opts" id="ob-opts-2">
+        <button class="ob-opt" data-val="deadline_driven" onclick="obSel(2,this)">I work best when the deadline is close. Pressure is where clarity lives.</button>
+        <button class="ob-opt" data-val="step_by_step" onclick="obSel(2,this)">Big things shut me down until I break them into something smaller.</button>
+        <button class="ob-opt" data-val="planner" onclick="obSel(2,this)">I need to know the right approach before I can start. I think before I move.</button>
+        <button class="ob-opt" data-val="focus_defender" onclick="obSel(2,this)">Starting isn't the problem. Staying in it without getting pulled away is.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(2)">←</button>
+        <button class="ob-btn-next" id="ob-next-2" onclick="obNext(2)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Drive Type -->
+    <div class="ob-step" id="ob-s3">
+      <div class="ob-q-num">3 of 7</div>
+      <div class="ob-q">When you decide to give something priority — what's underneath that decision?</div>
+      <div class="ob-opts" id="ob-opts-3">
+        <button class="ob-opt" data-val="promotion" onclick="obSel(3,this)">The gain. What I can build, learn, or become because of it.</button>
+        <button class="ob-opt" data-val="prevention" onclick="obSel(3,this)">The cost. What gets worse or breaks if I don't do it.</button>
+        <button class="ob-opt" data-val="both" onclick="obSel(3,this)">Both. Loss and gain both have real weight.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(3)">←</button>
+        <button class="ob-btn-next" id="ob-next-3" onclick="obNext(3)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Coaching Style -->
+    <div class="ob-step" id="ob-s4">
+      <div class="ob-q-num">4 of 7</div>
+      <div class="ob-q">When you've been avoiding something, or you hit a wall — what actually helps you move?</div>
+      <div class="ob-opts" id="ob-opts-4">
+        <button class="ob-opt" data-val="direct" onclick="obSel(4,this)">Tell me straight what's happening. Unvarnished is fine.</button>
+        <button class="ob-opt" data-val="analytical" onclick="obSel(4,this)">Show me the pattern. Data without the lecture.</button>
+        <button class="ob-opt" data-val="socratic" onclick="obSel(4,this)">Ask me what I think is wrong. I usually know — I just need to say it.</button>
+        <button class="ob-opt" data-val="behavioral" onclick="obSel(4,this)">Give me one thing I can do in the next 10 minutes. Small is real.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(4)">←</button>
+        <button class="ob-btn-next" id="ob-next-4" onclick="obNext(4)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Accountability -->
+    <div class="ob-step" id="ob-s5">
+      <div class="ob-q-num">5 of 7</div>
+      <div class="ob-q">Not in theory — in practice. What actually makes you follow through?</div>
+      <div class="ob-opts" id="ob-opts-5">
+        <button class="ob-opt" data-val="internal" onclick="obSel(5,this)">A promise to myself. I don't want to be the person who doesn't.</button>
+        <button class="ob-opt" data-val="external" onclick="obSel(5,this)">Someone else counting on me. External stakes make it real.</button>
+        <button class="ob-opt" data-val="momentum" onclick="obSel(5,this)">Seeing it move. Once momentum starts, I stay in it.</button>
+        <button class="ob-opt" data-val="deadline" onclick="obSel(5,this)">The deadline itself. If urgency isn't real, nothing moves.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(5)">←</button>
+        <button class="ob-btn-next" id="ob-next-5" onclick="obNext(5)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Purpose Anchor (free text) -->
+    <div class="ob-step" id="ob-s6">
+      <div class="ob-q-num">6 of 7</div>
+      <div class="ob-q">What are you actually trying to build, achieve, or become in the next 90 days?<br><span style="font-size:14px;font-weight:400;color:var(--muted)">Not the task list — the real thing underneath it.</span></div>
+      <textarea id="ob-purpose" class="ob-ta" placeholder="Write it in your own words. No right answer."></textarea>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(6)">←</button>
+        <button class="ob-btn-next" id="ob-next-6" onclick="obNext(6)">Next →</button>
+        <button class="ob-skip" onclick="obSkip(6)" title="Skip this question">Skip</button>
+      </div>
+    </div>
+
+    <!-- Step 7: Memory Depth -->
+    <div class="ob-step" id="ob-s7">
+      <div class="ob-q-num">7 of 7</div>
+      <div class="ob-q">How much should I hold between sessions?</div>
+      <div class="ob-opts" id="ob-opts-7">
+        <button class="ob-opt" data-val="deep" onclick="obSel(7,this)">Everything. The more you know, the better you show up for me.</button>
+        <button class="ob-opt" data-val="standard" onclick="obSel(7,this)">Track what I do and how I work. Keep the emotional layer lighter.</button>
+        <button class="ob-opt" data-val="light" onclick="obSel(7,this)">Just who I am and what I'm building. Professional context only.</button>
+        <button class="ob-opt" data-val="fresh" onclick="obSel(7,this)">Start fresh each time. I'll bring you what you need when I need you.</button>
+      </div>
+      <div class="ob-nav">
+        <button class="ob-btn-back" onclick="obBack(7)">←</button>
+        <button class="ob-btn-next" id="ob-next-7" onclick="obFinish()" disabled>Done — let's go →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== APP SHELL ===================== -->
 <div class="app">
   <header class="topbar">
@@ -370,6 +653,8 @@
     </div>
     <div class="brand"><b>Nova</b><span>the brain of TaskFlow</span></div>
     <button class="about-btn" id="aboutBtn" title="How Nova works">How Nova works</button>
+    <button class="profile-btn" id="profileBtn" title="Your profile" onclick="openProfileModal()"><span id="profile-name-pill">Profile</span></button>
+    <button class="end-btn" id="endBtn" title="End session — Nova will reflect on it" onclick="endSession()">End session</button>
     <div class="pill" id="pill"><span class="led"></span> local</div>
   </header>
 
@@ -436,13 +721,166 @@ ssEls.forEach((el,i) => setTimeout(()=>{ el.classList.add('show'); }, 280 + i*42
   }, t);
 });
 
+/* ===================== PROFILE + ONBOARDING ===================== */
+let OB_NEEDED = false, OB_STEP = 0;
+const OB_ANSWERS = {};
+
+async function loadProfile(){
+  try{
+    const d = await(await fetch('/api/profile')).json();
+    const p = d.profile || {};
+    OB_NEEDED = !p.profile_complete;
+    if(!OB_NEEDED) updateProfilePill(p);
+  }catch(e){ OB_NEEDED = false; }
+}
+
+function updateProfilePill(profile){
+  const name = ((profile||{}).basics||{}).name || '';
+  const pill = $('profile-name-pill');
+  if(pill) pill.textContent = name || 'Profile';
+}
+
+function showOnboarding(){
+  const ob = $('onboarding');
+  ob.style.display = 'flex';
+  requestAnimationFrame(()=> ob.classList.add('show'));
+  obUpdateDots(0);
+}
+
+function obUpdateDots(step){
+  for(let i=0;i<=7;i++){
+    const d=$('ob-d'+i); if(!d) continue;
+    d.classList.remove('done','active');
+    if(i<step) d.classList.add('done');
+    else if(i===step) d.classList.add('active');
+  }
+}
+
+window.obSel=function(step,btn){
+  document.querySelectorAll('#ob-opts-'+step+' .ob-opt').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  OB_ANSWERS['q'+step] = btn.dataset.val;
+  const nxt=$('ob-next-'+step); if(nxt) nxt.disabled=false;
+};
+
+window.obSkip=function(step){
+  if(step===6) OB_ANSWERS.q6_text='';
+  obNext(step);
+};
+
+window.obNext=function(step){
+  if(step===0){
+    OB_ANSWERS._basics={
+      name: ($('ob-name')||{}).value||'',
+      pronouns: ($('ob-pronouns')||{}).value||'',
+      life_context: ($('ob-context')||{}).value||'',
+      peak_hours: ($('ob-peak')||{}).value||'',
+    };
+    fetch('/api/profile/basics',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(OB_ANSWERS._basics)}).catch(()=>{});
+  } else if(step===6){
+    OB_ANSWERS.q6_text = (($('ob-purpose')||{}).value||'').trim();
+  }
+  const cur=$('ob-s'+step), nxt=$('ob-s'+(step+1));
+  if(!nxt) return;
+  cur.classList.remove('active');
+  nxt.classList.add('active');
+  OB_STEP=step+1;
+  obUpdateDots(step+1);
+};
+
+window.obBack=function(step){
+  const cur=$('ob-s'+step), prev=$('ob-s'+(step-1));
+  if(!prev) return;
+  cur.classList.remove('active');
+  prev.classList.add('active','back');
+  OB_STEP=step-1;
+  obUpdateDots(step-1);
+  setTimeout(()=>prev.classList.remove('back'),400);
+};
+
+window.obFinish=async function(){
+  const btn=$('ob-next-7');
+  if(btn){btn.disabled=true;btn.textContent='One moment…';}
+  const payload={
+    basics: OB_ANSWERS._basics||{},
+    answers:{
+      q1:OB_ANSWERS.q1||'',  q2:OB_ANSWERS.q2||'',
+      q3:OB_ANSWERS.q3||'',  q4:OB_ANSWERS.q4||'',
+      q5:OB_ANSWERS.q5||'',  q6_text:OB_ANSWERS.q6_text||'',
+      q7:OB_ANSWERS.q7||'',
+    }
+  };
+  let personalGreeting = greetingText, profileData = null;
+  try{
+    const resp=await fetch('/api/profile/complete',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await resp.json();
+    if(d.ok){ personalGreeting=d.greeting||greetingText; profileData=d.profile||null; }
+  }catch(e){}
+  // 1.5 s pause: the proof-of-listening moment before the first personalized greeting
+  setTimeout(()=>{
+    const ob=$('onboarding');
+    ob.classList.remove('show'); ob.classList.add('out');
+    setTimeout(()=>{
+      ob.style.display='none';
+      if(profileData) updateProfilePill(profileData);
+      const purpose=((profileData||{}).nova||{}).purpose_90d||'';
+      if(purpose) pinPurpose(purpose);
+      addNova(personalGreeting,[]);
+      loadContext(); loadMemory(); loadOpportunities();
+    },500);
+  },1500);
+};
+
+function pinPurpose(purpose){
+  const rail=document.querySelector('.rail'); if(!rail) return;
+  const div=document.createElement('div');
+  div.innerHTML='<div class="rail-h" style="margin-top:0">Your goal</div>'
+    +'<div style="background:var(--surface);border:1px solid color-mix(in srgb,var(--ai) 30%,transparent);'
+    +'border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:var(--muted)">'
+    +esc(purpose)+'</div><div style="height:22px"></div>';
+  rail.insertBefore(div,rail.firstChild);
+}
+
+window.openProfileModal=function(){
+  showModal(
+    '<div class="m-title" style="margin-bottom:14px">Your Profile</div>'
+    +'<p style="color:var(--muted);font-size:13px;margin-bottom:18px">Stored locally in <code>~/.taskflow/user_profile.json</code></p>'
+    +'<div style="display:flex;flex-direction:column;gap:10px">'
+    +'<a class="m-btn primary" href="/api/profile" target="_blank" rel="noopener">View raw JSON ↗</a>'
+    +'<button class="m-btn ghost" onclick="closeModal();OB_NEEDED=true;showOnboarding()">Re-run onboarding</button>'
+    +'</div>'
+  );
+};
+
+window.endSession=async function(){
+  const btn=$('endBtn');
+  if(btn){btn.textContent='Reflecting…';btn.disabled=true;}
+  try{
+    const d=await(await fetch('/api/reflect',{method:'POST'})).json();
+    const n=d.count||(d.entries||[]).length;
+    addNova(n>0
+      ? 'Session logged. '+n+' observation'+(n>1?'s':'')+' written to memory — the thread carries forward.'
+      : 'Session complete. Come back when you’re ready.',
+    []);
+  }catch(e){
+    addNova('Session complete. See you next time.',[]);
+  }
+  if(btn){btn.textContent='End session';btn.disabled=false;}
+};
+
 function hideSplash(){
   const elapsed = Date.now() - splashStart;
   const wait = Math.max(0, SPLASH_MIN_MS - elapsed);
   setTimeout(()=>{
     const sp = $('splash');
     sp.classList.add('out');
-    setTimeout(()=>{ sp.style.display='none'; addNova(greetingText, []); }, 700);
+    setTimeout(()=>{
+      sp.style.display='none';
+      if(OB_NEEDED){ showOnboarding(); }
+      else{ addNova(greetingText,[]); updateProfilePill(); loadContext(); loadMemory(); loadOpportunities(); }
+    }, 700);
   }, wait);
 }
 
@@ -758,10 +1196,8 @@ async function loadGreeting(){
   hideSplash();
 }
 
+loadProfile();
 loadGreeting();
-loadContext();
-loadMemory();
-loadOpportunities();
 </script>
 </body>
 </html>
