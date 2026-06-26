@@ -219,6 +219,22 @@
   .dots i:nth-child(2){animation-delay:.18s}.dots i:nth-child(3){animation-delay:.36s}
   @keyframes dotPop{0%,100%{opacity:.2;transform:translateY(0) scale(.8)}50%{opacity:1;transform:translateY(-3px) scale(1)}}
 
+  /* ===================== WELCOME SUGGESTIONS ===================== */
+  .suggest-wrap{margin:8px 0 4px 43px;animation:rise .5s ease both}
+  .suggest-hd{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:11px}
+  .suggest-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .suggest-card{display:flex;flex-direction:column;gap:4px;text-align:left;
+    background:linear-gradient(160deg,var(--surface),color-mix(in srgb,var(--surface2) 55%,var(--surface)));
+    border:1px solid var(--border);border-radius:12px;padding:13px 15px;cursor:pointer;
+    font-family:var(--sans);transition:border-color .16s,transform .14s,box-shadow .16s}
+  .suggest-card:hover{border-color:color-mix(in srgb,var(--ai) 50%,transparent);transform:translateY(-2px);
+    box-shadow:0 8px 26px color-mix(in srgb,var(--ai) 14%,transparent)}
+  .suggest-card:active{transform:scale(.98)}
+  .suggest-card .sc-t{font-size:13.5px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:7px}
+  .suggest-card .sc-ico{color:var(--ai);font-size:13px}
+  .suggest-card .sc-d{font-size:11.5px;color:var(--muted);line-height:1.45}
+  @media(max-width:600px){.suggest-grid{grid-template-columns:1fr}.suggest-wrap{margin-left:0}}
+
   /* ===================== COMPOSER ===================== */
   .composer{flex-shrink:0;border-top:1px solid var(--border);background:linear-gradient(0deg,#11161f,var(--bg));padding:12px 20px 16px}
   .composer-in{max-width:760px;margin:0 auto}
@@ -973,6 +989,7 @@ window.obFinish=async function(){
       const purpose=((profileData||{}).nova||{}).purpose_90d||'';
       if(purpose) pinPurpose(purpose);
       addNova(personalGreeting,[]);
+      showSuggestions();
       loadContext(); loadOpportunities();
     },500);
   },1500);
@@ -1088,10 +1105,44 @@ function hideSplash(){
     setTimeout(()=>{
       sp.style.display='none';
       if(OB_NEEDED){ showOnboarding(); }
-      else{ addNova(greetingText,[]); updateProfilePill(); loadContext(); loadOpportunities(); }
+      else{
+        addNova(greetingText,[]);
+        updateProfilePill(tools_profile);
+        const _pp=((tools_profile||{}).nova||{}).purpose_90d||''; if(_pp) pinPurpose(_pp);
+        showSuggestions();
+        loadContext(); loadOpportunities();
+      }
     }, 700);
   }, wait);
 }
+
+/* ===================== WELCOME SUGGESTIONS ===================== */
+const SUGGESTIONS=[
+  {mode:'brief', t:'What should I focus on now?', d:'A briefing from your live board', ico:'◎'},
+  {mode:'plan',  t:'Turn a goal into tasks',      d:"Describe it — I'll break it down", ico:'◆'},
+  {mode:'coach', t:'Why do I keep stalling?',     d:'The pattern behind it, no lecture', ico:'◈'},
+  {mode:'ask',   t:'Ask me anything',             d:'I route it to the right specialist', ico:'✦'},
+];
+function showSuggestions(){
+  if($('suggestWrap')) return;
+  const w=document.createElement('div'); w.className='suggest-wrap'; w.id='suggestWrap';
+  w.innerHTML='<div class="suggest-hd">Try one to start</div><div class="suggest-grid">'+SUGGESTIONS.map((s,i)=>
+    '<button class="suggest-card" onclick="pickSuggestion('+i+')">'
+    +'<span class="sc-t"><span class="sc-ico">'+s.ico+'</span> '+esc(s.t)+'</span>'
+    +'<span class="sc-d">'+esc(s.d)+'</span></button>').join('')+'</div>';
+  $('stream').appendChild(w);
+  scrollDown();
+}
+function hideSuggestions(){ const w=$('suggestWrap'); if(w) w.remove(); }
+window.pickSuggestion=function(i){
+  const s=SUGGESTIONS[i]; if(!s) return;
+  MODE=s.mode;
+  document.querySelectorAll('.chip[data-mode]').forEach(x=>x.classList.toggle('on',x.dataset.mode===s.mode));
+  $('msg').placeholder=PH[MODE]||'Ask Nova anything…';
+  hideSuggestions();
+  if(s.mode==='brief'||s.mode==='coach'){ send(); }
+  else { $('msg').focus(); }
+};
 
 /* ===================== HELPERS ===================== */
 function esc(s){return(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -1166,6 +1217,7 @@ async function send(){
   const needsText=(MODE==="ask"||MODE==="plan");
   if(needsText&&!text){ ta.focus(); return; }
   busy=true; $("send").disabled=true;
+  hideSuggestions();
   if(text) addUser(text);
   else addUser({brief:"Brief me.",coach:"Coach me — what should I fix?"}[MODE]||"…");
   ta.value=""; ta.style.height="auto";
@@ -1380,11 +1432,12 @@ function newSession(){
   // Clear the thread and start fresh
   $('stream').innerHTML='';
   addNova(greetingText,[]);
+  showSuggestions();
   renderHistoryList();
 }
 
 function loadSession(id){
-  closeHistory();
+  closeHistory(); hideSuggestions();
   _SESS_ID=id; localStorage.setItem(HIST_CUR,id);
   const sess=_getSession(id); if(!sess) return;
   $('stream').innerHTML='';
