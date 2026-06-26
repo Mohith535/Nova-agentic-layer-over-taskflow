@@ -409,7 +409,7 @@ The workflow also runs on every push to `nova/**` — every relevant commit show
 - **Reflection Agent** — end-of-session behavioral field notes → memory entries
 - **Pattern Intelligence Agent** — weekly multi-week analysis → `nova_insights.json` (Coach reads it)
 - MCP server over stdio (11 typed tools, read/write split enforced per agent)
-- Agent Skills standard (`.agents/skills/nova/SKILL.md` — mirrored to `.claude/`, `.antigravitycli/`)
+- Agent Skills standard (`.agents/skills/nova/SKILL.md` — mirrored to `.antigravitycli/` for Antigravity)
 - Web console: animated orbital splash, live grounding strip, tool-call transparency, mode chips
 - 7-question psychological onboarding (full-screen, one question at a time, dot progress)
 - **AI Import** — optional onboarding step: paste what ChatGPT / Claude / Gemini / Perplexity already knows about you (a tailored copy-paste prompt per model); Nova extracts it and **pre-fills the 7 questions** for you to confirm
