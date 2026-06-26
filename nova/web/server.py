@@ -295,7 +295,7 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 return generate_greeting(tools)
             try:
                 with _cf.ThreadPoolExecutor(max_workers=1) as ex:
-                    text = ex.submit(_run_greeting_agent).result(timeout=8.0)
+                    text = ex.submit(_run_greeting_agent).result(timeout=3.5)
                 # Additional guard: if the agent returned something trivially short, use fallback
                 if not text or len(text.split()) < 5:
                     text = fallback

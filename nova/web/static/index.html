@@ -380,6 +380,7 @@
             transition:all .15s;flex-shrink:0}
   .hist-btn:hover{color:var(--text);border-color:var(--dim)}
   .hist-btn svg{width:15px;height:15px}
+  .hist-btn.hist-open{color:var(--ai);border-color:color-mix(in srgb,var(--ai) 45%,transparent);background:color-mix(in srgb,var(--ai) 8%,transparent)}
 
   /* ===================== ONBOARDING OVERLAY ===================== */
   /* display:none by default — JS sets display:flex before adding .show so the opacity
@@ -743,7 +744,7 @@
 <!-- ===================== APP SHELL ===================== -->
 <div class="app">
   <header class="topbar">
-    <button class="hist-btn" onclick="openHistory()" title="Chat history" aria-label="Chat history">
+    <button class="hist-btn" id="histBtn" onclick="$('histDrawer').classList.contains('open')?closeHistory():openHistory()" title="Chat history" aria-label="Chat history">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
     </button>
     <div class="mark" aria-hidden="true">
@@ -1294,10 +1295,11 @@ function saveToHistory(role, text, tools){
   if(tools&&tools.length) msg.tools=tools.map(t=>typeof t==='string'?t:(t.name||''));
   s[id].messages.push(msg);
   s[id].updated_at=_now();
-  // Auto-title from first user message
-  if(!s[id].title){
-    if(role==='user' && text) s[id].title=text.replace(/<[^>]+>/g,' ').trim().slice(0,60);
-    else if(role==='nova' && text && s[id].messages.length===1) s[id].title='Session '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  // Auto-title: user message always wins, Nova greeting is placeholder only
+  if(role==='user' && text){
+    s[id].title=text.replace(/<[^>]+>/g,' ').trim().slice(0,60);
+  } else if(role==='nova' && text && !s[id].title){
+    s[id].title='Session '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }
   _saveStore(s);
   renderHistoryList();
@@ -1386,8 +1388,19 @@ function _drawHistList(sessions,q){
   el.innerHTML=html;
 }
 
-function openHistory(){ $('histDrawer').classList.add('open'); $('histBack').classList.add('open'); renderHistoryList(); }
-function closeHistory(){ $('histDrawer').classList.remove('open'); $('histBack').classList.remove('open'); }
+function openHistory(){
+  $('histDrawer').classList.add('open');
+  $('histBack').classList.add('open');
+  var btn=$('histBtn');
+  if(btn){ btn.classList.add('hist-open'); btn.setAttribute('title','Close history'); }
+  renderHistoryList();
+}
+function closeHistory(){
+  $('histDrawer').classList.remove('open');
+  $('histBack').classList.remove('open');
+  var btn=$('histBtn');
+  if(btn){ btn.classList.remove('hist-open'); btn.setAttribute('title','Chat history'); }
+}
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeHistory(); });
 
 // Timestamps on messages
@@ -1474,7 +1487,7 @@ window.planFromOpportunity=function(i){
 /* ===================== GREETING + SPLASH INIT ===================== */
 async function loadGreeting(){
   const ctrl = new AbortController();
-  const bail = setTimeout(()=>ctrl.abort(), 5000);
+  const bail = setTimeout(()=>ctrl.abort(), 10000);
   try{
     const d = await (await fetch("/api/greeting", {signal:ctrl.signal})).json();
     clearTimeout(bail);
