@@ -329,6 +329,58 @@
   ::-webkit-scrollbar-thumb:hover{background:#2c374a}
   @media(max-width:900px){.rail{display:none}}
 
+  /* ===================== HISTORY DRAWER ===================== */
+  .hist-backdrop{position:fixed;inset:0;z-index:149;background:rgba(0,0,0,.45);
+                 backdrop-filter:blur(2px);display:none;animation:fadeIn .18s ease both}
+  .hist-backdrop.open{display:block}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .hist-drawer{
+    position:fixed;top:0;left:0;bottom:0;width:300px;z-index:150;
+    background:#0d1117;border-right:1px solid var(--border);
+    display:flex;flex-direction:column;
+    transform:translateX(-100%);transition:transform .28s cubic-bezier(.16,1,.3,1);
+  }
+  .hist-drawer.open{transform:translateX(0)}
+  .hist-top{display:flex;align-items:center;gap:8px;padding:14px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .hist-new{flex:1;background:color-mix(in srgb,var(--ai) 12%,transparent);border:1px solid color-mix(in srgb,var(--ai) 25%,transparent);
+            border-radius:8px;padding:7px 10px;color:var(--ai);font-size:12.5px;font-family:var(--sans);cursor:pointer;
+            transition:all .15s;white-space:nowrap}
+  .hist-new:hover{background:color-mix(in srgb,var(--ai) 20%,transparent)}
+  .hist-search{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+               padding:7px 10px;color:var(--text);font-size:12.5px;font-family:var(--sans);outline:none;
+               transition:border-color .2s}
+  .hist-search:focus{border-color:var(--ai)}
+  .hist-search::placeholder{color:var(--dim)}
+  .hist-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 6px;
+              line-height:1;transition:color .14s;flex-shrink:0}
+  .hist-close:hover{color:var(--text)}
+  .hist-list{flex:1;overflow-y:auto;padding:8px 0}
+  .hist-group-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);
+                    padding:12px 14px 4px;font-weight:600}
+  .hist-item{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;cursor:pointer;
+             transition:background .14s;border-radius:0;position:relative}
+  .hist-item:hover{background:var(--surface2)}
+  .hist-item.active{background:color-mix(in srgb,var(--ai) 8%,transparent)}
+  .hist-item .hi-icon{width:28px;height:28px;border-radius:8px;flex-shrink:0;
+                      background:var(--surface2);display:flex;align-items:center;justify-content:center;
+                      font-size:13px;color:var(--ai);margin-top:1px}
+  .hist-item .hi-body{flex:1;min-width:0}
+  .hist-item .hi-title{font-size:13px;color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+  .hist-item .hi-meta{font-size:11px;color:var(--dim);margin-top:2px}
+  .hist-item .hi-del{position:absolute;right:8px;top:8px;background:none;border:none;color:var(--dim);
+                     font-size:14px;cursor:pointer;opacity:0;transition:opacity .12s,color .12s;padding:2px 5px}
+  .hist-item:hover .hi-del{opacity:1}
+  .hist-item .hi-del:hover{color:var(--red)}
+  .hist-empty{padding:32px 14px;text-align:center;color:var(--dim);font-size:13px;line-height:1.6}
+  .hist-search-empty{padding:20px 14px;text-align:center;color:var(--dim);font-size:13px}
+
+  /* History button in topbar */
+  .hist-btn{background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;
+            display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);
+            transition:all .15s;flex-shrink:0}
+  .hist-btn:hover{color:var(--text);border-color:var(--dim)}
+  .hist-btn svg{width:15px;height:15px}
+
   /* ===================== ONBOARDING OVERLAY ===================== */
   /* display:none by default — JS sets display:flex before adding .show so the opacity
      transition still works. Without this the overlay sits at opacity:0 but blocks
@@ -677,16 +729,30 @@
   </div>
 </div>
 
+<!-- ===================== HISTORY DRAWER ===================== -->
+<div class="hist-backdrop" id="histBack" onclick="closeHistory()"></div>
+<div class="hist-drawer" id="histDrawer">
+  <div class="hist-top">
+    <button class="hist-new" onclick="newSession()">＋ New chat</button>
+    <input class="hist-search" id="histSearch" placeholder="Search…" oninput="searchHistory(this.value)">
+    <button class="hist-close" onclick="closeHistory()">×</button>
+  </div>
+  <div class="hist-list" id="histList"><div class="hist-empty">No chats yet.<br>Start talking and they appear here.</div></div>
+</div>
+
 <!-- ===================== APP SHELL ===================== -->
 <div class="app">
   <header class="topbar">
+    <button class="hist-btn" onclick="openHistory()" title="Chat history" aria-label="Chat history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+    </button>
     <div class="mark" aria-hidden="true">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.6L21 11l-6.8 2.4L12 20l-2.2-6.6L3 11l6.8-2.4z"/></svg>
     </div>
     <div class="brand"><b>Nova</b><span>the brain of TaskFlow</span></div>
     <button class="about-btn" id="aboutBtn" title="How Nova works">How Nova works</button>
     <button class="profile-btn" id="profileBtn" title="Your profile" onclick="openProfileModal()"><span id="profile-name-pill">Profile</span></button>
-    <button class="end-btn" id="endBtn" title="End session — Nova will reflect on it" onclick="endSession()">End session</button>
+    <button class="end-btn" id="endBtn" title="End session — Nova writes 2-3 behavioral observations to memory so tomorrow's greeting knows the thread" onclick="endSession()">End session</button>
     <div class="pill" id="pill"><span class="led"></span> local</div>
   </header>
 
@@ -761,6 +827,7 @@ async function loadProfile(){
   try{
     const d = await(await fetch('/api/profile')).json();
     const p = d.profile || {};
+    tools_profile = p;
     OB_NEEDED = !p.profile_complete;
     if(!OB_NEEDED) updateProfilePill(p);
   }catch(e){ OB_NEEDED = false; }
@@ -891,15 +958,31 @@ function pinPurpose(purpose){
 }
 
 window.openProfileModal=function(){
-  showModal(
-    '<div class="m-title" style="margin-bottom:14px">Your Profile</div>'
-    +'<p style="color:var(--muted);font-size:13px;margin-bottom:18px">Stored locally in <code>~/.taskflow/user_profile.json</code></p>'
-    +'<div style="display:flex;flex-direction:column;gap:10px">'
-    +'<a class="m-btn primary" href="/api/profile" target="_blank" rel="noopener">View raw JSON ↗</a>'
-    +'<button class="m-btn ghost" onclick="closeModal();OB_NEEDED=true;showOnboarding()">Re-run onboarding</button>'
-    +'</div>'
+  const p=tools_profile||{};
+  const b=p.basics||{}, n=p.nova||{};
+  const rows=[
+    b.name?`<tr><td>Name</td><td>${esc(b.name)}</td></tr>`:'',
+    b.pronouns?`<tr><td>Pronouns</td><td>${esc(b.pronouns)}</td></tr>`:'',
+    b.life_context?`<tr><td>Context</td><td>${esc(b.life_context)}</td></tr>`:'',
+    b.peak_hours?`<tr><td>Peak hours</td><td>${esc(b.peak_hours)}</td></tr>`:'',
+    n.work_style?`<tr><td>Work style</td><td>${esc(n.work_style.replace(/_/g,' '))}</td></tr>`:'',
+    n.coaching_style?`<tr><td>Coaching style</td><td>${esc(n.coaching_style)}</td></tr>`:'',
+    n.purpose_90d?`<tr><td style="vertical-align:top">Goal (90d)</td><td style="color:var(--ai)">${esc(n.purpose_90d)}</td></tr>`:'',
+  ].filter(Boolean).join('');
+  openModal(
+    '<button class="modal-x" onclick="closeModal()">×</button>'+
+    '<h3>Your Profile</h3>'+
+    '<div class="msub" style="margin-bottom:16px">Stored locally in <code>~/.taskflow/user_profile.json</code> — shared between Nova and TaskFlow.</div>'+
+    (rows?'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px">'+
+     '<colgroup><col style="width:110px"><col></colgroup>'+rows+'</table>':
+     '<div class="msub" style="margin-bottom:16px">Profile not set up yet.</div>')+
+    '<div style="display:flex;gap:10px">'+
+    '<a class="m-btn primary" href="/api/profile" target="_blank" rel="noopener" style="flex:1;text-align:center">View raw JSON ↗</a>'+
+    '<button class="m-btn ghost" onclick="closeModal();OB_NEEDED=true;showOnboarding()" style="flex:1">Re-run onboarding</button>'+
+    '</div>'
   );
 };
+let tools_profile=null;  // cached after first loadProfile
 
 window.endSession=async function(){
   const btn=$('endBtn');
@@ -948,10 +1031,13 @@ function scrollDown(){ const t=$("thread"); t.scrollTop=t.scrollHeight; }
 function pct(x){ return Math.round((x||0)*100)+"%"; }
 
 /* ===================== MESSAGES ===================== */
+function _tsChip(){ return `<span class="msg-ts">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>`; }
 function addUser(text){
+  ensureSession();
   const el=document.createElement("div"); el.className="msg me";
-  el.innerHTML='<div class="av me">you</div><div class="body-col"><div class="who">You</div><div class="bubble">'+fmt(text)+'</div></div>';
+  el.innerHTML='<div class="av me">you</div><div class="body-col"><div class="who">You '+_tsChip()+'</div><div class="bubble">'+fmt(esc(text))+'</div></div>';
   $("stream").appendChild(el); scrollDown();
+  saveToHistory('user', text, []);
 }
 function addThinking(){
   const el=document.createElement("div"); el.className="msg nova"; el.id="thinking";
@@ -971,12 +1057,15 @@ function buildFlowTrace(tools){
 }
 
 function addNova(text, tools, isErr){
+  ensureSession();
   const el=document.createElement("div"); el.className="msg nova";
   const trace=(tools&&tools.length)?buildFlowTrace(tools):"";
-  el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova'
+  el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova '
+    +_tsChip()
     +(tools&&tools.length?' · '+tools.length+' tool'+(tools.length>1?'s':''):'')
     +'</div>'+trace+'<div class="bubble'+(isErr?' err':'')+'">'+fmt(text)+'</div></div>';
   $("stream").appendChild(el); scrollDown();
+  if(!isErr) saveToHistory('nova', text, tools||[]);
 }
 
 /* ===================== MODES ===================== */
@@ -1150,6 +1239,161 @@ window.doForget=async()=>{
   addNova("Done — clean slate. Nothing you said before will color what I say next. Whenever you’re ready, we start from zero.",[]);
 };
 
+/* ===================== CHAT HISTORY (localStorage) ===================== */
+const HIST_KEY = 'nova_sessions';
+const HIST_CUR = 'nova_session_id';
+let _SESS_ID = null;
+
+function _now(){ return new Date().toISOString(); }
+function _fmtDate(iso){
+  const d=new Date(iso), now=new Date();
+  const todayStr=now.toDateString(), dStr=d.toDateString();
+  if(dStr===todayStr) return 'Today · '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const yest=new Date(now); yest.setDate(yest.getDate()-1);
+  if(dStr===yest.toDateString()) return 'Yesterday · '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString([],{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+function _fmtGroupDate(iso){
+  const d=new Date(iso), now=new Date();
+  if(d.toDateString()===now.toDateString()) return 'Today';
+  const yest=new Date(now); yest.setDate(yest.getDate()-1);
+  if(d.toDateString()===yest.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([],{month:'long',day:'numeric'});
+}
+
+function _loadStore(){
+  try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'{}'); }catch(e){ return {}; }
+}
+function _saveStore(s){ localStorage.setItem(HIST_KEY, JSON.stringify(s)); }
+
+function _getSession(id){
+  const s=_loadStore(); return s[id]||null;
+}
+function _getAllSessions(){
+  const s=_loadStore();
+  return Object.values(s).sort((a,b)=> new Date(b.updated_at)-new Date(a.updated_at));
+}
+
+function ensureSession(){
+  let id = _SESS_ID || localStorage.getItem(HIST_CUR);
+  const s=_loadStore();
+  if(!id || !s[id]){
+    id = 'sess_'+Date.now();
+    s[id]={ id, created_at:_now(), updated_at:_now(), title:'', messages:[] };
+    _saveStore(s); localStorage.setItem(HIST_CUR, id);
+  }
+  _SESS_ID = id;
+  return id;
+}
+
+function saveToHistory(role, text, tools){
+  const id=ensureSession();
+  const s=_loadStore();
+  if(!s[id]) return;
+  const msg={role,ts:_now(),text:(text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,2000)};
+  if(tools&&tools.length) msg.tools=tools.map(t=>typeof t==='string'?t:(t.name||''));
+  s[id].messages.push(msg);
+  s[id].updated_at=_now();
+  // Auto-title from first user message
+  if(!s[id].title){
+    if(role==='user' && text) s[id].title=text.replace(/<[^>]+>/g,' ').trim().slice(0,60);
+    else if(role==='nova' && text && s[id].messages.length===1) s[id].title='Session '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  }
+  _saveStore(s);
+  renderHistoryList();
+}
+
+function newSession(){
+  closeHistory();
+  _SESS_ID='sess_'+Date.now();
+  localStorage.setItem(HIST_CUR, _SESS_ID);
+  const s=_loadStore();
+  s[_SESS_ID]={ id:_SESS_ID, created_at:_now(), updated_at:_now(), title:'', messages:[] };
+  _saveStore(s);
+  // Clear the thread and start fresh
+  $('stream').innerHTML='';
+  addNova(greetingText,[]);
+  renderHistoryList();
+}
+
+function loadSession(id){
+  closeHistory();
+  _SESS_ID=id; localStorage.setItem(HIST_CUR,id);
+  const sess=_getSession(id); if(!sess) return;
+  $('stream').innerHTML='';
+  (sess.messages||[]).forEach(m=>{
+    if(m.role==='user') _renderUserMsg(m.text,m.ts);
+    else if(m.role==='nova') _renderNovaMsg(m.text,m.tools||[],m.ts);
+  });
+  scrollDown();
+  renderHistoryList();
+}
+
+function deleteSession(id,e){
+  if(e) e.stopPropagation();
+  const s=_loadStore(); delete s[id]; _saveStore(s);
+  if(_SESS_ID===id){ $('stream').innerHTML=''; _SESS_ID=null; localStorage.removeItem(HIST_CUR); }
+  renderHistoryList();
+}
+
+function _renderUserMsg(text,ts){
+  const el=document.createElement('div'); el.className='msg me';
+  const meta=ts?`<div class="msg-ts">${_fmtDate(ts)}</div>`:'';
+  el.innerHTML='<div class="av me">you</div><div class="body-col"><div class="who">You'+meta+'</div><div class="bubble">'+fmt(esc(text))+'</div></div>';
+  $('stream').appendChild(el);
+}
+function _renderNovaMsg(text,tools,ts){
+  const el=document.createElement('div'); el.className='msg nova';
+  const toolHtml=tools&&tools.length?'<div class="tools">'+tools.map(t=>`<span class="tool-chip">${esc(t)}</span>`).join('')+'</div>':'';
+  const meta=ts?`<div class="msg-ts">${_fmtDate(ts)}</div>`:'';
+  el.innerHTML='<div class="av nova">✦</div><div class="body-col"><div class="who">Nova · restored'+meta+'</div>'+toolHtml+'<div class="bubble">'+fmt(text)+'</div></div>';
+  $('stream').appendChild(el);
+}
+
+function searchHistory(q){
+  q=(q||'').toLowerCase().trim();
+  const all=_getAllSessions();
+  const filtered=q?all.filter(s=>{
+    if((s.title||'').toLowerCase().includes(q)) return true;
+    return (s.messages||[]).some(m=>(m.text||'').toLowerCase().includes(q));
+  }):all;
+  _drawHistList(filtered,q);
+}
+
+function renderHistoryList(){ searchHistory(($('histSearch')||{}).value||''); }
+
+function _drawHistList(sessions,q){
+  const el=$('histList'); if(!el) return;
+  if(!sessions.length){
+    el.innerHTML=q?'<div class="hist-search-empty">No chats match "'+esc(q)+'"</div>':
+                   '<div class="hist-empty">No chats yet.<br>Start talking and they appear here.</div>';
+    return;
+  }
+  let html='', lastGroup='';
+  sessions.forEach(sess=>{
+    const g=_fmtGroupDate(sess.updated_at||sess.created_at);
+    if(g!==lastGroup){ html+=`<div class="hist-group-label">${esc(g)}</div>`; lastGroup=g; }
+    const active=sess.id===_SESS_ID?' active':'';
+    const title=esc(sess.title||'Untitled chat');
+    const meta=_fmtDate(sess.updated_at||sess.created_at);
+    const count=(sess.messages||[]).length;
+    html+=`<div class="hist-item${active}" onclick="loadSession('${esc(sess.id)}')">
+      <div class="hi-icon">✦</div>
+      <div class="hi-body"><div class="hi-title">${title}</div><div class="hi-meta">${esc(meta)} · ${count} msg${count!==1?'s':''}</div></div>
+      <button class="hi-del" onclick="deleteSession('${esc(sess.id)}',event)" title="Delete">×</button>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function openHistory(){ $('histDrawer').classList.add('open'); $('histBack').classList.add('open'); renderHistoryList(); }
+function closeHistory(){ $('histDrawer').classList.remove('open'); $('histBack').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeHistory(); });
+
+// Timestamps on messages
+const _msgTsStyle = '<style>.msg-ts{font-size:10px;color:var(--dim);margin-left:8px;font-weight:400;letter-spacing:.3px}</style>';
+document.head.insertAdjacentHTML('beforeend',_msgTsStyle);
+
 /* ===================== MODAL ===================== */
 function openModal(html){ $("modalCard").innerHTML=html; $("modal").classList.add("show"); }
 function closeModal(){ $("modal").classList.remove("show"); }
@@ -1157,18 +1401,19 @@ $("modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal();
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
 
 function openAbout(){
-  openModal(
-    '<button class="modal-x" onclick="closeModal()">×</button>'+
-    '<h3>How Nova works</h3>'+
-    '<div class="msub">Nova reads what you’ve actually been doing in TaskFlow — postpone patterns, deadline changes, completion rates — so its read on you is grounded in real data, not guesses. It never leaves your machine.</div>'+
-    '<div class="cap"><b>Ask</b><span>Say anything — Nova routes to the right specialist.</span></div>'+
-    '<div class="cap"><b>Brief</b><span>What to do right now, from your live load and time of day.</span></div>'+
-    '<div class="cap"><b>Plan</b><span>Turns a goal into real, right-sized TaskFlow tasks (you review before anything is created).</span></div>'+
-    '<div class="cap"><b>Coach</b><span>Tells you <i>why</i> you keep stalling — with the research mechanism and one concrete change.</span></div>'+
-    '<div class="credit">Built for <b style="color:var(--ai)">Kaggle × Google — AI Agents Intensive 2026</b> · '+
-    'on top of <b><a href="http://127.0.0.1:18083" target="_blank" style="color:var(--ai)">TaskFlow v9.1.0 ↗</a></b> · '+
-    'Local-first · your data stays on your machine.</div>'
-  );
+  var h=[
+    `<button class="modal-x" onclick="closeModal()">&times;</button>`,
+    `<h3>How Nova works</h3>`,
+    `<div class="msub">Nova reads what you’ve actually been doing in TaskFlow — postpone patterns, deadline changes, completion rates — so its read on you is grounded in real data, not guesses. It never leaves your machine.</div>`,
+    `<div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--ai);margin:18px 0 10px;font-weight:700">8 Agents · 1 Purpose</div>`,
+    `<div style="font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:16px">Behind every response is a system of 8 specialized agents. Four handle your conversations (Orchestrator, Briefing, Planning, Coach). Four handle who you are — a <b style="color:var(--text)">Greeting Agent</b> that opens every session from your profile and memory, a <b style="color:var(--text)">Profile Agent</b> that ran your onboarding, a <b style="color:var(--text)">Reflection Agent</b> triggered by End session, and a <b style="color:var(--text)">Pattern Intelligence Agent</b> that finds multi-week behavioral patterns. Each agent has one job and only the tools it needs.</div>`,
+    `<div class="cap"><b>Ask</b><span>Say anything — Nova routes to the right specialist.</span></div>`,
+    `<div class="cap"><b>Brief</b><span>What to do right now, from your live load and time of day.</span></div>`,
+    `<div class="cap"><b>Plan</b><span>Turns a goal into real, right-sized TaskFlow tasks (you review before anything is created).</span></div>`,
+    `<div class="cap"><b>Coach</b><span>Tells you <i>why</i> you keep stalling — with the research mechanism and one concrete change.</span></div>`,
+    `<div class="credit">Built for <b style="color:var(--ai)">Kaggle × Google — AI Agents Intensive 2026</b> · on top of <b><a href="http://127.0.0.1:18083" target="_blank" style="color:var(--ai)">TaskFlow v9.1.0 ↗</a></b> · Local-first · your data stays on your machine.</div>`
+  ].join('');
+  openModal(h);
 }
 $("aboutBtn").addEventListener("click",openAbout);
 
