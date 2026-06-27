@@ -141,7 +141,6 @@ class NovaTools:
         candidates += [
             Path(self.reader.data_dir) / "opportunities.json",
             Path.home() / ".taskflow" / "opportunities.json",
-            Path("E:/agent for my self/data/history.json"),
         ]
         path = next((p for p in candidates if p.exists()), None)
         if not path:

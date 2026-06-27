@@ -130,6 +130,15 @@ def ensure_data_dir() -> str:
         cfg.write_text(_json.dumps({"nova_data_enabled": True, "first_run_complete": True},
                                    indent=2), encoding="utf-8")
 
+    # Seed a demo Scout feed too (only if absent) so the Opportunities panel isn't empty
+    # on a clean machine. A user with a live Opportunity Hunter points Nova at its output
+    # via NOVA_OPPORTUNITIES_PATH instead (that env var wins over this file).
+    opps = target / "opportunities.json"
+    if not opps.exists():
+        seed_opps = _Path(__file__).resolve().parent / "seed" / "opportunities.json"
+        if seed_opps.exists():
+            _shutil.copyfile(seed_opps, opps)
+
     os.environ["TASKFLOW_DATA_PATH"] = str(target)
     if seeded:
         print(f"[nova] No TaskFlow board found — seeded demo data into {target}", flush=True)
