@@ -18,6 +18,10 @@ tasks.json
 !docs/sample_taskflow/tasks.json
 !nova/seed/tasks.json
 
+# Internal working notes — never publish (contain audit/optics notes + local paths)
+docs/RE_AUDIT_BRIEFING.txt
+docs/*_BRIEFING.txt
+
 # OS / IDE junk
 .DS_Store
 Thumbs.db
