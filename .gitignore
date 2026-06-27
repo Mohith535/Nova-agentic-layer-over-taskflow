@@ -21,6 +21,7 @@ tasks.json
 # Internal working notes — never publish (contain audit/optics notes + local paths)
 docs/RE_AUDIT_BRIEFING.txt
 docs/*_BRIEFING.txt
+CLAUDE.md
 
 # OS / IDE junk
 .DS_Store
