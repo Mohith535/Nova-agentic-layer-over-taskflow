@@ -244,41 +244,47 @@ def extract_import(tools: NovaTools, text: str, source: str = "other",
     """
     from google import genai
     from google.genai import types
-    from ..config import fast_gemini_model
+    from ..config import best_model, mark_exhausted
 
-    model = model or fast_gemini_model()
     text = (text or "").strip()[:8000]  # cap input to protect quota
     out = {"best_guess": {}, "memory_seeds": [], "recognized": "", "error": ""}
     if not text:
         return out
 
     prompt = f"SOURCE AI: {source}\n\nPORTRAIT THE USER PASTED:\n{text}"
-    try:
-        client = genai.Client()
-        resp = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=IMPORT_EXTRACT_SYS,
-                temperature=0.2,
-                max_output_tokens=900,
-            ),
-        )
-        raw = (getattr(resp, "text", None) or "").strip()
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if m:
-            parsed = json.loads(m.group(0))
-            out["best_guess"] = parsed.get("best_guess") or {}
-            out["memory_seeds"] = parsed.get("memory_seeds") or []
-            out["recognized"] = (parsed.get("recognized") or "").strip()
-    except Exception as e:
-        msg = str(e)
-        if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-            out["error"] = "rate_limit"
-        elif "API_KEY" in msg.upper() or "authentication" in msg.lower():
-            out["error"] = "no_key"
-        else:
-            out["error"] = "unavailable"
+    # Quota-aware: if a model is rate-limited, mark it and fall through to the next tier —
+    # the same routing the main agents use, so one exhausted model can't kill the import.
+    for _ in range(3):
+        m = model or best_model("ask")
+        try:
+            client = genai.Client()
+            resp = client.models.generate_content(
+                model=m,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=IMPORT_EXTRACT_SYS,
+                    temperature=0.2,
+                    max_output_tokens=900,
+                ),
+            )
+            raw = (getattr(resp, "text", None) or "").strip()
+            mm = re.search(r"\{.*\}", raw, re.DOTALL)
+            if mm:
+                parsed = json.loads(mm.group(0))
+                out["best_guess"] = parsed.get("best_guess") or {}
+                out["memory_seeds"] = parsed.get("memory_seeds") or []
+                out["recognized"] = (parsed.get("recognized") or "").strip()
+            out["error"] = ""
+            break
+        except Exception as e:
+            msg = str(e)
+            if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+                mark_exhausted(m)
+                out["error"] = "rate_limit"
+                model = None  # let best_model pick the next non-exhausted tier
+                continue
+            out["error"] = "no_key" if ("API_KEY" in msg.upper() or "authentication" in msg.lower()) else "unavailable"
+            break
 
     # Validate enums — honest "" if the model gave something invalid/missing
     enum_map = {
