@@ -201,6 +201,20 @@ def main() -> int:
         if v:
             set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
 
+        # Prove it works on the spot — a DRY RUN: scrapes + scores, but sends no phone
+        # push and adds no tasks. The fastest way to confirm the install is healthy.
+        try:
+            go = input("\n  Run a quick TEST hunt now to confirm it works? (y/N): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            go = "n"
+        if go in ("y", "yes"):
+            print("  Dry-run hunt (no phone push, no tasks added) — this can take a minute…\n")
+            try:
+                subprocess.run([sys.executable, "main.py", "--test"], cwd=str(hunter))
+                print("\n  ✓ If you saw a brief above with scanned/relevant counts, the Hunter works.")
+            except Exception as e:
+                print(f"  ! Test hunt couldn't run ({e}). Try it directly: cd {hunter} && python main.py --test")
+
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
     section("3. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
     repo = prompt("Sync repo (owner/name)", "A PRIVATE GitHub repo, e.g. yourname/taskflow-sync", "")
