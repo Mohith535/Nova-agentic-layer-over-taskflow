@@ -38,14 +38,25 @@ def ensure_from_example(env_path: Path, example_path: Path) -> None:
         shutil.copy2(example_path, env_path)
 
 
+# Values shipped in .env.example are placeholders, not real keys — treat them as unset so
+# a freshly-copied .env never shows "already set" for something the user hasn't entered.
+_PLACEHOLDER_MARKERS = ("your-", "-here", "your_", "set-your-own", "your key", "changeme", "xxxx")
+
+
+def _is_placeholder(v: str) -> bool:
+    lv = (v or "").strip().lower()
+    return (not lv) or any(m in lv for m in _PLACEHOLDER_MARKERS)
+
+
 def read_key(env_path: Path, key: str) -> str:
-    """Current value of KEY in a .env file, or '' if unset/missing."""
+    """Current REAL value of KEY in a .env file — '' if unset, missing, or a placeholder."""
     if not env_path.exists():
         return ""
     for line in env_path.read_text(encoding="utf-8").splitlines():
         s = line.strip()
         if s.startswith(f"{key}=") and not s.startswith("#"):
-            return s.split("=", 1)[1].strip()
+            v = s.split("=", 1)[1].strip()
+            return "" if _is_placeholder(v) else v
     return ""
 
 
@@ -154,15 +165,28 @@ def offer_hunter(wrote: list[str]) -> Path | None:
 
 
 def main() -> int:
-    print("\n" + "=" * 60)
-    print("  NOVA — CONFIGURATION WIZARD")
-    print("  Enter your keys once. Skip anything with Enter. Re-runnable.")
-    print("=" * 60)
+    print("\n" + "=" * 62)
+    print("   ✦  N O V A  —  S E T U P   W I Z A R D")
+    print("=" * 62)
 
     if not sys.stdin.isatty():
         print("\n  Not an interactive terminal — nothing to prompt. Edit the .env files by hand,")
         print("  or run `python configure.py` in a real terminal.")
         return 0
+
+    # What you'll need — set expectations up front so nothing feels like a surprise.
+    print("""
+  Here's everything Nova can use — all free, and only the first is essential:
+
+     Gemini API key     Nova's live AI agents           ·  essential
+     Groq API key       sharper opportunity scoring     ·  optional
+     ntfy topic         push alerts to your phone       ·  optional
+     Telegram bot       act on tasks from your phone    ·  optional
+     GitHub token       phone <-> cloud task sync        ·  optional
+
+  Have any handy? Enter them below. Don't have one yet? Press Enter to skip it
+  and add it later, any time, by running:   python configure.py
+""")
 
     wrote: list[str] = []
 
@@ -170,9 +194,9 @@ def main() -> int:
     section("1. NOVA  ·  live AI agents (Gemini)")
     nova_env = NOVA_DIR / ".env"
     ensure_from_example(nova_env, NOVA_DIR / ".env.example")
-    cur = read_key(nova_env, "GEMINI_API_KEY")
-    cur = "" if cur in ("", "your-key-here") else cur
-    v = prompt("Gemini API key", "Free, 1500 req/day: https://aistudio.google.com/apikey", cur, required=True)
+    v = prompt("Gemini API key",
+               "Get one free (30 sec): aistudio.google.com/apikey -> Create API key -> copy",
+               read_key(nova_env, "GEMINI_API_KEY"), required=True)
     if v:
         set_key(nova_env, "GEMINI_API_KEY", v)
         wrote.append("Nova .env — Gemini key")
@@ -186,34 +210,56 @@ def main() -> int:
         h_env = hunter / ".env"
         ensure_from_example(h_env, hunter / ".env.example")
 
-        v = prompt("ntfy topic (phone alerts)", "Any secret string; subscribe to it in the free ntfy app", read_key(h_env, "NTFY_TOPIC"))
+        v = prompt("ntfy topic (free phone alerts)",
+                   "Install the 'ntfy' app (Android: Play Store · iPhone: App Store), open it, "
+                   "tap + to Subscribe, invent any secret word (e.g. mohith-hunt-7k2), and paste "
+                   "that same word here.",
+                   read_key(h_env, "NTFY_TOPIC"))
         if v:
             set_key(h_env, "NTFY_TOPIC", v); wrote.append("Hunter .env — ntfy topic")
 
-        v = prompt("Groq API key (opportunity scoring)", "Free, no card: https://console.groq.com", read_key(h_env, "GROQ_API_KEY"))
+        v = prompt("Groq API key (sharper AI scoring)",
+                   "Free, no card: console.groq.com -> API Keys -> Create -> copy",
+                   read_key(h_env, "GROQ_API_KEY"))
         if v:
             set_key(h_env, "GROQ_API_KEY", v); wrote.append("Hunter .env — Groq key")
 
-        v = prompt("Telegram bot token (tap-to-act control)", "@BotFather → /newbot → paste the token", read_key(h_env, "TELEGRAM_BOT_TOKEN"))
+        v = prompt("Telegram bot token (act from your phone)",
+                   "In Telegram, open t.me/BotFather -> send /newbot -> follow prompts -> copy the token",
+                   read_key(h_env, "TELEGRAM_BOT_TOKEN"))
         if v:
             set_key(h_env, "TELEGRAM_BOT_TOKEN", v); wrote.append("Hunter .env — Telegram token")
-        v = prompt("Telegram chat id", "Message your bot /start after running: python telegram_listener.py", read_key(h_env, "TELEGRAM_CHAT_ID"))
+        v = prompt("Telegram chat id",
+                   "Send /start to YOUR new bot, then run `python telegram_listener.py` in the "
+                   "Hunter folder — it prints your chat id. Paste it here.",
+                   read_key(h_env, "TELEGRAM_CHAT_ID"))
         if v:
             set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
 
-        # Prove it works on the spot — a DRY RUN: scrapes + scores, but sends no phone
-        # push and adds no tasks. The fastest way to confirm the install is healthy.
-        try:
-            go = input("\n  Run a quick TEST hunt now to confirm it works? (y/N): ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            go = "n"
-        if go in ("y", "yes"):
-            print("  Dry-run hunt (no phone push, no tasks added) — this can take a minute…\n")
+        # A confirmation run is only meaningful once there's a scoring key or a delivery
+        # channel to exercise. With nothing configured, we say so plainly and skip it —
+        # rather than run a heavy live scrape that can't notify or score with intelligence.
+        has_hunter_key = any(read_key(h_env, k) for k in
+                             ("GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY",
+                              "NTFY_TOPIC", "TELEGRAM_BOT_TOKEN"))
+        if not has_hunter_key:
+            print("\n  The Hunter is installed and linked to Nova — but you haven't added a scoring")
+            print("  key (Groq) or an alert channel (ntfy/Telegram) yet, so there's nothing to")
+            print("  meaningfully confirm right now. Skipping the test run.")
+            print("  Add a free Groq key later with `python configure.py`, then it's fully live.")
+        else:
             try:
-                subprocess.run([sys.executable, "main.py", "--test"], cwd=str(hunter))
-                print("\n  ✓ If you saw a brief above with scanned/relevant counts, the Hunter works.")
-            except Exception as e:
-                print(f"  ! Test hunt couldn't run ({e}). Try it directly: cd {hunter} && python main.py --test")
+                go = input("\n  Run a quick confirmation hunt now? (dry run — scrapes & scores real\n"
+                           "  sources, sends no alerts, adds no tasks)  (y/N): ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                go = "n"
+            if go in ("y", "yes"):
+                print("\n  Confirmation run in progress — this can take a minute…\n")
+                try:
+                    subprocess.run([sys.executable, "main.py", "--test"], cwd=str(hunter))
+                    print("\n  ✓ A brief with 'scanned / relevant / new' counts above means the Hunter works.")
+                except Exception as e:
+                    print(f"  ! Couldn't run it here ({e}). Try directly: cd {hunter} && python main.py --test")
 
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
     section("3. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
@@ -229,16 +275,28 @@ def main() -> int:
         wrote.append("Hunter .env — sync repo")
 
     # summary — never echo the secrets themselves
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 62)
+    print("   ✦  SETUP COMPLETE")
+    print("=" * 62)
     if wrote:
-        print("  ✓ Saved:")
+        print("\n  Saved:")
         for w in wrote:
             print(f"      · {w}")
     else:
-        print("  Nothing changed — every field was skipped.")
-    print("\n  Done. Launch Nova with:  nova web")
-    print("  (Re-run `python configure.py` any time to add or change a key.)")
-    print("=" * 60 + "\n")
+        print("\n  No keys entered — that's fine. Nova runs fully on demo data.")
+
+    gemini_ready = bool(read_key(nova_env, "GEMINI_API_KEY"))
+    print("\n  WHAT'S NEXT")
+    print("      1. Nova is about to open at  http://127.0.0.1:8765")
+    if gemini_ready:
+        print("      2. The live AI agents are ON — try 'Ask', 'Coach', or 'Operator'.")
+    else:
+        print("      2. No Gemini key yet, so explore on demo data. Add one any time to")
+        print("         switch the live AI on:  python configure.py")
+    if hunter:
+        print("      3. The Opportunity Hunter is linked — ask Nova's 'Scout' to find or run a hunt.")
+    print("\n  Change or add any key later, any time:   python configure.py")
+    print("=" * 62 + "\n")
     return 0
 
 
