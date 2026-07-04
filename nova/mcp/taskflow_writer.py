@@ -113,6 +113,51 @@ class TaskFlowWriter:
                     return t
             return None
 
+    def postpone_task(self, task_id: int, new_deadline_iso: Optional[str] = None) -> Optional[dict]:
+        """Postpone a task, faithful to TaskFlow's own semantics: move the deadline,
+        increment postpone_count, append to postpone_history, and record the edit —
+        so TaskFlow's postpone mirror ("postponed ×3") and Nova's Coach both stay honest."""
+        with _WRITE_LOCK:
+            tasks = self.reader._raw_tasks()
+            for t in tasks:
+                if int(t.get("id", -1)) == task_id:
+                    if t.get("completed"):
+                        return None
+                    old = t.get("deadline")
+                    if new_deadline_iso:
+                        t["deadline"] = new_deadline_iso
+                    t["postpone_count"] = int(t.get("postpone_count") or 0) + 1
+                    t.setdefault("postpone_history", []).append(_now_iso())
+                    t["last_decision"] = "postponed"
+                    t["last_decision_at"] = _now_iso()
+                    t.setdefault("edit_history", []).append(
+                        _edit("postpone", old, new_deadline_iso or old, "postponed via Nova")
+                    )
+                    self._atomic_save(tasks)
+                    return t
+            return None
+
+    def drop_task(self, task_id: int, reason: str) -> bool:
+        """Soft-drop a task — TaskFlow's 'preserve, never erase' rule. Sets dropped_at /
+        drop_reason / last_decision so the behavioral record survives (the Coach reads it);
+        the task simply leaves the active board. Never a hard delete."""
+        with _WRITE_LOCK:
+            tasks = self.reader._raw_tasks()
+            for t in tasks:
+                if int(t.get("id", -1)) == task_id:
+                    if t.get("dropped_at"):
+                        return True
+                    t["dropped_at"] = _now_iso()
+                    t["drop_reason"] = reason or "dropped via Nova"
+                    t["last_decision"] = "dropped"
+                    t["last_decision_at"] = _now_iso()
+                    t.setdefault("edit_history", []).append(
+                        _edit("status", t.get("status"), "dropped", reason or "dropped via Nova")
+                    )
+                    self._atomic_save(tasks)
+                    return True
+            return False
+
     def set_prime_target(self, task_id: int) -> bool:
         """Set today's single Prime Target via TaskFlow's timeline mapping
         (``{task_id: "YYYY-MM-DD_prime"}``), enforcing one-per-day."""

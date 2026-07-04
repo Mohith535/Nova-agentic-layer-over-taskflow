@@ -91,6 +91,11 @@ class NovaTools:
         )
 
     def get_behavioral_stats(self) -> BehavioralStats:
+        # nova_read gates behavioral analysis (completion rate, postpone patterns). Off →
+        # a zeroed result so the Coach honestly has "no behavioral data" rather than pattern-mine.
+        if not self.reader.permission("nova_read"):
+            return BehavioralStats(total_tasks=0, completion_rate=0.0, avg_postpone_count=0.0,
+                                   most_postponed=[], deadline_moves=0)
         tasks = self.reader.load_tasks()
         total = len(tasks)
         completed = sum(1 for t in tasks if t.completed)
@@ -119,6 +124,11 @@ class NovaTools:
         )
 
     def get_edit_history(self, task_id: Optional[int] = None, days: int = 7) -> list[EditEvent]:
+        # nova_read gates the rich behavioral trail (edit reasons, offload/drop notes,
+        # postpone history). When off, the operational task list still works but the
+        # sensitive "why" data stays private. Matches TaskFlow's "core always, rich gated".
+        if not self.reader.permission("nova_read"):
+            return []
         return self.reader.load_edit_history(days=days, task_id=task_id)
 
     def get_opportunities(self, min_score: int = 0, limit: int = 10,
@@ -213,21 +223,123 @@ class NovaTools:
         self.audit.record("create_task", {"id": raw["id"], "title": clean["title"], "priority": clean["priority"]})
         return NovaTask.from_dict(raw)
 
+    # PERMISSION GATE — the Operator may only act on your board while `operator_act` is on
+    # in TaskFlow's OPERATOR M → Advanced. Re-checked LIVE per call; a denied action is a
+    # no-op that is audited (never a silent success).
+    def _operator_allowed(self, action: str) -> bool:
+        if self.reader.permission("operator_act"):
+            return True
+        self.audit.record("permission_denied", {"action": action, "gate": "operator_act"})
+        return False
+
     def complete_task(self, task_id: int) -> bool:
+        if not self._operator_allowed("complete_task"):
+            return False
         ok = self.writer.complete_task(int(task_id))
         self.audit.record("complete_task", {"id": int(task_id), "ok": ok})
         return ok
 
     def schedule_task(self, task_id: int, date: str) -> Optional[NovaTask]:
+        if not self._operator_allowed("schedule_task"):
+            return None
         date_iso = iv.validate_date(date)
         raw = self.writer.schedule_task(int(task_id), date_iso)
         self.audit.record("schedule_task", {"id": int(task_id), "date": date_iso, "ok": raw is not None})
         return NovaTask.from_dict(raw) if raw else None
 
     def set_prime_target(self, task_id: int) -> bool:
+        if not self._operator_allowed("set_prime_target"):
+            return False
         ok = self.writer.set_prime_target(int(task_id))
         self.audit.record("set_prime_target", {"id": int(task_id), "ok": ok})
         return ok
+
+    def postpone_task(self, task_id: int, new_deadline: Optional[str] = None) -> Optional[NovaTask]:
+        """Postpone a task (optionally to a new deadline). Mirrors TaskFlow's semantics:
+        postpone_count, postpone_history, and the edit record all stay honest."""
+        if not self._operator_allowed("postpone_task"):
+            return None
+        deadline_iso = iv.validate_deadline(new_deadline) if new_deadline else None
+        raw = self.writer.postpone_task(int(task_id), deadline_iso)
+        self.audit.record("postpone_task", {"id": int(task_id), "new_deadline": deadline_iso,
+                                            "ok": raw is not None})
+        return NovaTask.from_dict(raw) if raw else None
+
+    def drop_task(self, task_id: int, reason: str = "") -> bool:
+        """Soft-drop a task (preserve, never erase). The behavioral record survives."""
+        if not self._operator_allowed("drop_task"):
+            return False
+        clean_reason = iv.clean_notes(reason) or "dropped via Nova"
+        ok = self.writer.drop_task(int(task_id), clean_reason)
+        self.audit.record("drop_task", {"id": int(task_id), "reason": clean_reason[:80], "ok": ok})
+        return ok
+
+    # ---- HUNTER CONTROL (Scout agent) -------------------------------------
+    def get_hunter_status(self) -> dict:
+        """Opportunity Hunter health: connected, last run, item counts, source breakdown."""
+        from .hunter_bridge import HunterBridge
+        return HunterBridge().status()
+
+    def run_opportunity_hunt(self, test: bool = False, sources: Optional[str] = None) -> dict:
+        """Launch an Opportunity Hunter run (detached — returns immediately)."""
+        from .hunter_bridge import HunterBridge
+        result = HunterBridge().start_hunt(test=test, sources=sources)
+        self.audit.record("run_opportunity_hunt", {"started": result.get("started"),
+                                                   "test": bool(test), "sources": sources})
+        return result
+
+    # ---- SYNC CONTROL (Operator agent) -------------------------------------
+    def sync_taskflow(self, direction: str = "push") -> dict:
+        """Run TaskFlow's own cloud sync via its CLI (`taskflow sync push|pull`).
+
+        Subprocess, not import — the data+process coupling rule holds. TaskFlow stays the
+        single authority for what gets pushed/pulled; Nova just presses the button."""
+        import shutil
+        import subprocess
+        direction = (direction or "push").strip().lower()
+        if direction not in ("push", "pull"):
+            return {"success": False, "error": "direction must be 'push' or 'pull'"}
+        exe = shutil.which("taskflow")
+        if not exe:
+            return {"success": False,
+                    "error": "taskflow CLI not found on PATH — sync from the TaskFlow dashboard instead"}
+        try:
+            proc = subprocess.run(
+                [exe, "sync", direction],
+                capture_output=True, text=True, timeout=120,
+                encoding="utf-8", errors="replace",
+            )
+            out = (proc.stdout or "").strip()
+            ok = proc.returncode == 0 and "✗" not in out
+            self.audit.record("sync_taskflow", {"direction": direction, "ok": ok})
+            return {"success": ok, "direction": direction,
+                    "detail": out[-400:] if out else (proc.stderr or "").strip()[-400:]}
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "sync timed out after 120s — check the network"}
+        except (OSError, subprocess.SubprocessError) as e:
+            return {"success": False, "error": f"could not run sync: {e}"}
+
+    # ---- SYNC AWARENESS (Operator agent) -----------------------------------
+    def get_sync_status(self) -> dict:
+        """TaskFlow cloud-sync state: enabled?, repo, last push/pull times. Read-only —
+        Nova knows when the cloud copy is stale but never syncs on its own."""
+        import json as _json
+        cfg_path = self.reader.data_dir / "config.json"
+        state_path = self.reader.data_dir / "sync_state.json"
+        try:
+            cfg = _json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
+        except Exception:
+            cfg = {}
+        try:
+            state = _json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+        except Exception:
+            state = {}
+        return {
+            "enabled": bool(cfg.get("cloud_sync_enabled")),
+            "repo": cfg.get("sync_repo", ""),
+            "last_pushed_at": state.get("last_pushed_at"),
+            "last_pulled_at": state.get("last_pulled_at"),
+        }
 
     # ---- MEMORY (consent-gated, local, transparent) ----------------------
     def recall_memory(self, limit: int = 20) -> list[dict]:

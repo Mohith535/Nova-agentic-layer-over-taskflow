@@ -173,6 +173,16 @@ class TaskFlowReader:
         """The global behavioral-data consent gate. Default ON, matching TaskFlow."""
         return self.load_config().get("nova_data_enabled", True) is not False
 
+    def permission(self, key: str) -> bool:
+        """Read one agent-permission flag from TaskFlow's config.json `permissions` block
+        (nova_read / nova_memory / operator_act / ophunter_read / ophunter_write). Re-read
+        LIVE on every call so a toggle in TaskFlow's OPERATOR M applies without restarting Nova.
+        Missing/absent → True (permissive default, matching TaskFlow's own defaults)."""
+        perms = self.load_config().get("permissions", {})
+        if not isinstance(perms, dict):
+            return True
+        return perms.get(key, True) is not False
+
 
 def _as_str(v) -> Optional[str]:
     if v is None:

@@ -170,8 +170,12 @@ def _greeting(tools: NovaTools, dd) -> str:
     return " ".join(parts) if parts else f"{hello}. What's on your mind?"
 
 
-def _capture(agent, message: str) -> tuple[str, list[str]]:
-    """Run one agent turn; return (final_text, [tool names the agent actually called])."""
+def _capture(agent, message: str) -> tuple[str, list[str], str]:
+    """Run one agent turn; return (final_text, [tool names actually called], answering_agent).
+
+    answering_agent is the ADK author of the final response event — when the orchestrator
+    routes, that's the specialist ("operator", "scout", "coach"…), so the UI can show WHICH
+    agent handled the turn (the multi-agent story, made visible)."""
     from google.adk.runners import InMemoryRunner
     from google.genai import types
 
@@ -183,6 +187,7 @@ def _capture(agent, message: str) -> tuple[str, list[str]]:
 
     text_parts: list[str] = []
     tools_used: list[str] = []
+    answering_agent = ""
     for event in runner.run(user_id="local", session_id=created.id, new_message=content):
         c = getattr(event, "content", None)
         if not c or not getattr(c, "parts", None):
@@ -194,10 +199,12 @@ def _capture(agent, message: str) -> tuple[str, list[str]]:
                 tools_used.append(fc.name)
             if is_final and getattr(part, "text", None):
                 text_parts.append(part.text)
-    # de-dupe tools, preserve order
+                answering_agent = getattr(event, "author", "") or answering_agent
+    # de-dupe tools, preserve order; hide ADK's internal transfer call from the trace
     seen = set()
-    ordered = [t for t in tools_used if not (t in seen or seen.add(t))]
-    return "\n".join(text_parts).strip(), ordered
+    ordered = [t for t in tools_used
+               if t != "transfer_to_agent" and not (t in seen or seen.add(t))]
+    return "\n".join(text_parts).strip(), ordered, answering_agent
 
 
 def _friendly_error(msg: str) -> str:
@@ -359,7 +366,7 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         from ..agents.greeting_agent import generate_greeting
         try:
             profile = await run_in_threadpool(finalize_profile, tools, req.answers, req.basics)
-        except Exception as e:
+        except Exception:
             # Fallback: write a minimal profile so the user can proceed
             from datetime import datetime
             profile = tools.write_user_profile({
@@ -530,11 +537,14 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 return JSONResponse({"error": "run_failed", "message": _friendly_error(str(e))}, status_code=500)
             if not text:
                 text = "Empty response — quota may be exhausted. Resets at midnight Pacific."
-            return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode, "fast": True})
+            return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode,
+                                 "fast": True, "agent": "nova"})
 
         from ..agents.briefing_agent import build_briefing_agent
         from ..agents.coach_agent import build_coach_agent
+        from ..agents.operator_agent import build_operator_agent
         from ..agents.planning_agent import build_planning_agent
+        from ..agents.scout_agent import build_scout_agent
         from ..orchestrator import build_orchestrator
 
         model = best_model(mode)
@@ -542,6 +552,10 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             agent, msg = build_briefing_agent(tools, model), (msg or "Give me my briefing for right now.")
         elif mode == "coach":
             agent, msg = build_coach_agent(tools, model), (msg or "What pattern should I fix? Be specific.")
+        elif mode == "operator":
+            agent, msg = build_operator_agent(tools, model), (msg or "What's on my board right now?")
+        elif mode == "scout":
+            agent, msg = build_scout_agent(tools, model), (msg or "What opportunities are worth my time?")
         elif mode == "plan":
             if not msg:
                 return JSONResponse({"error": "need_goal", "message": "Enter a goal to plan."}, status_code=400)
@@ -550,10 +564,10 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
             agent, msg = build_orchestrator(dd, model), (msg or "What should I focus on right now?")
 
         last_exc = None
-        text, tools_used = "", []
+        text, tools_used, answered_by = "", [], ""
         for attempt in range(2):
             try:
-                text, tools_used = await run_in_threadpool(_capture, agent, msg)
+                text, tools_used, answered_by = await run_in_threadpool(_capture, agent, msg)
                 last_exc = None
                 break
             except Exception as e:
@@ -569,11 +583,14 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
                 break
 
         # Auto-fallback to fast single-call path for non-plan modes.
+        used_fallback = False
         if (not text or last_exc is not None) and mode in ("brief", "coach", "ask"):
             from ..agents.fast_coach import run_fast
             fallback_model = best_model(mode)   # router picks next available after mark_exhausted
             try:
-                text, tools_used = await run_in_threadpool(run_fast, tools, mode, msg, fallback_model)
+                text, tools_used = await run_in_threadpool(
+                    run_fast, tools, mode, msg, fallback_model, True)  # fallback=True: honest advice
+                used_fallback = True
                 last_exc = None
             except Exception as fe:
                 err_str = str(fe)
@@ -587,7 +604,8 @@ def build_app(dd: Optional[str] = None) -> FastAPI:
         if not text:
             text = ("All available models are quota-exhausted for today. "
                     "Resets at midnight Pacific — or get a new free key at aistudio.google.com/apikey.")
-        return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode})
+        return JSONResponse({"response": text, "tools_used": tools_used, "mode": mode,
+                             "agent": answered_by or "nova", "fallback": used_fallback})
 
     return app
 

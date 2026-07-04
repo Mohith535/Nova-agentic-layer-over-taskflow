@@ -22,10 +22,20 @@ from google.adk.tools.mcp_tool.mcp_toolset import McpToolset, StdioConnectionPar
 from mcp import StdioServerParameters
 
 READ_ONLY_TOOLS = ["get_today_context", "get_tasks", "get_behavioral_stats", "get_edit_history", "recall_memory", "get_opportunities"]
-WRITE_TOOLS = ["create_task", "complete_task", "schedule_task", "set_prime_target"]
+# Planning's writes match its in-process kit exactly (create/schedule/prime — it plans, it
+# does not complete): completing/postponing/dropping belongs to the Operator alone.
+WRITE_TOOLS = ["create_task", "schedule_task", "set_prime_target"]
 # Memory is a separate, low-stakes capability: writing a note about the user can never mutate
 # their tasks. Kept distinct from WRITE_TOOLS so the read-only/task-write split stays clean.
 MEMORY_TOOLS = ["remember"]
+# Operator: reads to resolve the task + the full board-management verbs (the ONLY agent that
+# can complete/postpone/drop) + sync awareness. Scout: opportunity feed + Hunter control + the
+# single write it needs (opportunity → task). Each list is a least-privilege boundary that
+# holds even over MCP.
+OPERATOR_TOOLS = ["get_today_context", "get_tasks", "complete_task", "schedule_task",
+                  "set_prime_target", "postpone_task", "drop_task", "get_sync_status",
+                  "sync_taskflow"]
+SCOUT_TOOLS = ["get_opportunities", "get_hunter_status", "run_opportunity_hunt", "create_task"]
 
 
 def mcp_toolset(data_dir: Optional[str] = None, tool_names: Optional[list[str]] = None,

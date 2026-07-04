@@ -2,7 +2,7 @@
 
 # ✦ Nova — the Brain of TaskFlow
 
-### Kaggle × Google · AI Agents: Intensive Vibe Coding Capstone · Concierge Track
+### Kaggle × Google · AI Agents: Intensive Vibe Coding Capstone · Freestyle Track
 
 <br/>
 
@@ -12,8 +12,8 @@
 <br/>
 
 <p>
-  <img src="https://img.shields.io/badge/ADK-8_Agents-A371F7?style=for-the-badge&labelColor=0d1117" alt="ADK" />
-  <img src="https://img.shields.io/badge/MCP-11_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
+  <img src="https://img.shields.io/badge/ADK-10_Agents-A371F7?style=for-the-badge&labelColor=0d1117" alt="ADK" />
+  <img src="https://img.shields.io/badge/MCP-17_Tools-58A6FF?style=for-the-badge&labelColor=0d1117" alt="MCP" />
   <img src="https://img.shields.io/badge/Your_Data-Stays_Local-3FB950?style=for-the-badge&labelColor=0d1117" alt="Local" />
   <img src="https://img.shields.io/badge/Gemini-Quota--Aware-D29922?style=for-the-badge&labelColor=0d1117" alt="Gemini" />
   <img src="https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge&labelColor=0d1117" alt="MIT" />
@@ -24,7 +24,7 @@
 <p>
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-what-nova-actually-does">What Nova Does</a> ·
-  <a href="#-the-eight-agents">The Agents</a> ·
+  <a href="#-the-ten-agents">The Agents</a> ·
   <a href="#-the-web-console">Web Console</a> ·
   <a href="#-architecture">Architecture</a> ·
   <a href="#-security">Security</a>
@@ -40,7 +40,7 @@
 
 ## The story (three sentences)
 
-[TaskFlow v9.1.0](https://github.com/Mohith535/TaskFlow) is a shipped, 100%-offline behavioral task manager that has been quietly recording *how you actually work* — what you postpone, the reasons you give when a deadline slips, how long tasks really take vs. how long you thought they would. **Nova is its brain.** It reads that real behavioral dataset through an MCP server and routes your request to one of three specialist ADK agents — so every answer is grounded in your data, not invented by a model.
+[TaskFlow v9.1.0](https://github.com/Mohith535/TaskFlow) is a shipped, 100%-offline behavioral task manager that has been quietly recording *how you actually work* — what you postpone, the reasons you give when a deadline slips, how long tasks really take vs. how long you thought they would. **Nova is its brain.** It reads that real behavioral dataset through an MCP server and routes your request to one of five specialist ADK agents — so every answer is grounded in your data, not invented by a model.
 
 > TaskFlow gave you the execution engine. Nova gives it a voice that actually knows you.
 
@@ -63,9 +63,23 @@ git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova
 git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova && cd nova && bash setup.sh
 ```
 
-The browser opens at **http://127.0.0.1:8765** with a sample board already loaded — **no API key needed** to explore the console, the live data grounding, and the agent architecture. (Nova self-seeds `~/.taskflow` on first run, so there's nothing to install separately.)
+That single command does four things: creates an isolated environment, installs Nova, runs a short **key wizard**, and opens the console. The browser lands at **http://127.0.0.1:8765** with a sample board already loaded.
 
-**To turn on the live AI agents:** copy `.env.example` → `.env`, drop in a free Gemini key ([aistudio.google.com/apikey](https://aistudio.google.com/apikey), ~30 sec), and restart. That's the only step that needs a key.
+**The key wizard (`configure.py`)** asks for your keys one at a time — press **Enter to skip any of them**. Nothing is required to explore: skip everything and you get the full console on demo data. It only asks for what unlocks each feature:
+
+| It asks for | Unlocks | Where to get it (all free) |
+|:--|:--|:--|
+| **Gemini API key** | the live AI agents | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (~30 sec) |
+| ntfy topic, Groq key, **Telegram** bot token + chat id | the Opportunity Hunter's alerts + tap-to-act *(only if it's installed alongside Nova)* | in-wizard links |
+| GitHub sync repo + token | phone ↔ cloud task sync | in-wizard links |
+
+Your keys are written to the right `.env` files locally (all git-ignored), never echoed back, and never leave your machine. Re-run the wizard any time to add or change a key:
+
+```bash
+python configure.py
+```
+
+**To turn on the live AI agents later** (if you skipped it): run `python configure.py` and paste a free Gemini key, then restart with `nova web`.
 
 <details>
 <summary><b>Prefer manual setup or the CLI?</b></summary>
@@ -79,7 +93,7 @@ nova brief        # today's mission briefing from your data
 nova plan "prepare for the Microsoft Explore interview"
 nova coach        # behavioral patterns + one concrete next step
 nova ask "what's actually blocking me right now?"
-nova mcp --selftest   # works with no key — lists the 11 MCP tools
+nova mcp --selftest   # works with no key — lists the 17 MCP tools
 ```
 </details>
 
@@ -174,20 +188,22 @@ You never see a quota error unless every model is exhausted. Tomorrow it resets 
 
 <br/>
 
-## 🤖 The Eight Agents
+## 🤖 The Ten Agents
 
-A single LLM with a pile of tools would have been simpler. Eight specialized agents is the right architecture because each boundary solves a concrete problem:
+A single LLM with a pile of tools would have been simpler. Ten specialized agents is the right architecture because each boundary solves a concrete problem:
 
 **Why multi-agent?** Least privilege (Coach literally can't write tasks), distinct voice per discipline, distinct cadence (some run once at onboarding, some run on every session, some run unattended on a schedule), and a feedback loop that compounds — Pattern Agent writes insights, Coach reads them, Greeting Agent reads memory that Reflection wrote.
 
 ### Core conversation agents
 
-| Agent | Trigger | Reads | Writes |
+| Agent | Trigger | Reads | Writes / Acts |
 |:---|:---|:---|:---|
 | **✦ Orchestrator** | every message | intent | routes to one specialist |
 | **✦ Briefing** | "What now?" / daily cron | live load, prime target, overdue, time of day | — |
 | **✦ Planning** | "Turn this goal into tasks" | current load, behavioral tags | tasks (post user confirmation) |
 | **✦ Coach** | "Why do I keep avoiding this?" | postpone patterns, edit history, deadline reasons, nova_insights.json | — |
+| **✦ Operator** | "mark 3 done" / "postpone 5 to Friday" / "drop it" | the board + cloud-sync state | complete · schedule · postpone · soft-drop *(asks first)* · prime target |
+| **✦ Scout** | "find opportunities" / "run a fresh hunt" | Opportunity Hunter feed + pipeline health | launches hunts (detached) · opportunity → task |
 
 ### New in this version: the relational layer
 
@@ -294,7 +310,7 @@ flowchart TD
 
     TOOLS[["NovaTools — one implementation"]]
     TOOLS -->|in-process| DATA
-    TOOLS -->|"MCP · stdio · 11 tools"| MCPS[("MCP Server<br/>no network socket")]
+    TOOLS -->|"MCP · stdio · 17 tools"| MCPS[("MCP Server<br/>no network socket")]
     MCPS --> DATA
 
     DATA[("~/.taskflow<br/>tasks · memory · profile · insights")]
@@ -315,7 +331,7 @@ nova/
     reflection_agent.py      end-of-session field notes → memory (2-3 entries)
     pattern_agent.py         weekly behavioral analysis → nova_insights.json
   mcp/
-    server.py                MCP server over stdio — 11 tools, no socket
+    server.py                MCP server over stdio — 17 tools, no socket
     tools.py                 NovaTools — tool layer; 11 exposed over MCP + in-process profile/session/pattern methods
   memory/store.py            local memory across sessions (consent-gated)
   web/
@@ -338,7 +354,7 @@ nova/
 
 ## 🔒 Security
 
-This is a Concierge track — security is a scored criterion, so it's enforced, not claimed.
+Freestyle judges best practices of agent development — security is a scored dimension, so it's enforced, not claimed.
 
 | Guarantee | How |
 |:---|:---|
@@ -403,12 +419,14 @@ The workflow also runs on every push to `nova/**` — every relevant commit show
 
 ### ✅ Shipped (this submission)
 
-- Multi-agent ADK system: Orchestrator + Briefing + Planning + Coach (4 conversation agents)
+- Multi-agent ADK system: Orchestrator + Briefing + Planning + Coach + Operator + Scout (6 conversation agents)
+- **Operator Agent** — board management from chat: complete, schedule, postpone, soft-drop (confirmed, record preserved), prime target, cloud-sync awareness
+- **Scout Agent** — commands the Opportunity Hunter pipeline: launch hunts (detached), report pipeline health, turn scored finds into scheduled tasks
 - **Greeting Agent** — personalized session opener, single fast Gemini call (quota-efficient by design)
 - **Profile Agent** — 7-question psychological onboarding → normalized `user_profile.json`
 - **Reflection Agent** — end-of-session behavioral field notes → memory entries
 - **Pattern Intelligence Agent** — weekly multi-week analysis → `nova_insights.json` (Coach reads it)
-- MCP server over stdio (11 typed tools, read/write split enforced per agent)
+- MCP server over stdio (17 typed tools, least-privilege split enforced per agent)
 - Agent Skills standard (`.agents/skills/nova/SKILL.md` — mirrored to `.antigravitycli/` for Antigravity)
 - Web console: animated orbital splash, live grounding strip, tool-call transparency, mode chips
 - 7-question psychological onboarding (full-screen, one question at a time, dot progress)
@@ -439,14 +457,14 @@ Nova's behavioral data collection is the foundation for a future model that trul
 
 <br/>
 
-## 🏆 Competition Track: Concierge Agents
+## 🏆 Competition Track: Freestyle
 
 Nova hits all six capstone concepts — on a foundation that is a *real shipped product*, not a demo:
 
 | Criterion | Implementation |
 |:---|:---|
-| **Multi-agent ADK** | Orchestrator routing to 3 least-privilege sub-agents + 4 supporting agents (8 total) — conversation + relational layers |
-| **MCP server** | 11 tools over stdio — the same implementation called in-process and over the protocol |
+| **Multi-agent ADK** | Orchestrator routing to 5 least-privilege sub-agents + 4 supporting agents (10 total) — including two that command external systems |
+| **MCP server** | 17 tools over stdio — the same implementation called in-process and over the protocol |
 | **Agent Skills** | `.agents/skills/nova/SKILL.md` — when to invoke, tools, voice, security model |
 | **Explicit security** | No network surface · path containment · honest LLM boundary · audit log · fail-closed validation |
 | **Deployability** | Daily GitHub Actions brief, green without secrets, live with `GEMINI_API_KEY` |

@@ -88,6 +88,44 @@ def build_server(data_dir: Optional[str] = None) -> FastMCP:
         """Set today's single Prime Target (the One Frog Protocol — one per day)."""
         return tools.set_prime_target(task_id)
 
+    @mcp.tool()
+    def postpone_task(task_id: int, new_deadline: Optional[str] = None) -> Optional[dict]:
+        """Postpone a task, optionally to a new deadline (ISO or natural language).
+        Keeps TaskFlow's honest postpone record: count, history, and the edit log."""
+        t = tools.postpone_task(task_id, new_deadline)
+        return t.model_dump() if t else None
+
+    @mcp.tool()
+    def drop_task(task_id: int, reason: str = "") -> bool:
+        """Soft-drop a task — the behavioral record is preserved (dropped_at + reason),
+        never hard-deleted. Requires the user's explicit confirmation upstream."""
+        return tools.drop_task(task_id, reason)
+
+    # ---- HUNTER CONTROL (Scout) ----
+    @mcp.tool()
+    def get_hunter_status() -> dict:
+        """Opportunity Hunter pipeline health: connected?, last run, items found,
+        high-priority count, per-source breakdown. Read-only."""
+        return tools.get_hunter_status()
+
+    @mcp.tool()
+    def run_opportunity_hunt(test: bool = False, sources: Optional[str] = None) -> dict:
+        """Launch a fresh Opportunity Hunter run in the background (returns immediately;
+        scraping + scoring takes minutes). test=True = dry run. sources e.g. 'arxiv,github'."""
+        return tools.run_opportunity_hunt(test, sources)
+
+    # ---- SYNC AWARENESS + CONTROL ----
+    @mcp.tool()
+    def get_sync_status() -> dict:
+        """TaskFlow cloud-sync state: enabled?, repo, last push/pull times. Read-only."""
+        return tools.get_sync_status()
+
+    @mcp.tool()
+    def sync_taskflow(direction: str = "push") -> dict:
+        """Run TaskFlow's cloud sync via its own CLI. direction: 'push' (board → cloud) or
+        'pull' (ingest cloud inbox). TaskFlow stays the authority; Nova presses the button."""
+        return tools.sync_taskflow(direction)
+
     # ---- MEMORY tools (consent-gated, local, user-visible) ----
     @mcp.tool()
     def recall_memory(limit: int = 20) -> list[dict]:

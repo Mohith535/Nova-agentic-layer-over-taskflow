@@ -1,119 +1,170 @@
-# Nova — the agent that knows *why* you keep avoiding it
+[IMAGE: cover — the 560×280 card, also drop it here as the hero]
 
-**Subtitle:** A privacy-first, multi-agent concierge built on a shipped behavioral task manager — it reads how you *actually* work and tells you what to do about it.
-**Track:** Concierge Agents
-**Code:** https://github.com/Mohith535/Nova-agentic-layer-over-taskflow ·
-**Foundation:** https://github.com/Mohith535/TaskFlow (v9.1.0)
+> **Nova reads how you _actually_ work — what you postpone, why deadlines slip, how long things really take — and coaches you with specifics no generic assistant can. Then it acts: it manages your task board and commands a second, independent agent pipeline that hunts opportunities for you. Your data never leaves your machine.**
 
-> *Draft for the 2,500-word Kaggle writeup. Paste into the Kaggle Writeup editor; attach the cover image + the YouTube video in the Media Gallery before submitting.*
+> 💬 *"Your #course tasks are postponed 4× on average and your completion rate is 0.2 — that's not a discipline gap, it's the signature of tasks too big to start. Split the next one into a 15-minute first step, and schedule only that."*
+> — Nova's Coach, grounded in a real behavioral dataset
+
+> 💬 *"Run a fresh hunt."* → Scout launches a separate scraping+scoring pipeline in the background, reports what it found, and turns the best find into a scheduled task — in one conversation.
+> — Nova's Scout, commanding a second agent system
 
 ---
 
-## The problem: the gap isn't writing tasks down — it's doing them
+## ⚡ At a glance
 
-Every productivity app is a better place to *write down* what you should do. None of them know *why you don't do it.* You've known for two weeks that you should start the interview prep. The gap isn't information — it's behavior. And behavior leaves a trail: which tasks you postpone, *how many times*, the small reason you mutter when you push a deadline, how long a task really takes versus what you guessed. No tool reads that trail back to you. Meanwhile every AI assistant bolted onto a to-do app gives the same hollow advice — *"break it into smaller steps!"* — because it only knows what you **typed**, never what you actually **did**.
+| | |
+|:--|:--|
+| **What it is** | A privacy-first, **multi-agent command center** that coaches you from your *real* behavioral data — and acts on it |
+| **Built on** | **TaskFlow v9.1.0** — a *shipped* behavioral task manager (real usage data, not a demo fixture) |
+| **Commands** | Its own task board **and a second, independent agent pipeline** (the Opportunity Hunter) |
+| **The tech** | **10 ADK agents** · a real **MCP server (17 tools)** · Gemini · **100% local data** |
+| **Course concepts** | **6 of 6** demonstrated (only 3 required) |
+| **Security** | No network surface · path containment · consent-gated · audit log · fail-closed |
+| **Try it** | **One command.** Demo data bundled. **No API key needed** to explore. |
 
-That trail is the fingerprint of *why a specific person* stalls: the planning fallacy, decision fatigue, a task too large to start, a Zeigarnik open loop. Nova's whole thesis: **turn the behavioral exhaust of task management into specific, honest coaching** — without becoming one more app that nags you, or one that ships your private life to a server.
+---
 
-## Why this is a Concierge problem
+## The problem — the gap isn't writing tasks down, it's *doing* them
 
-The data that makes Nova useful is intensely personal — your avoidance patterns, the emotional weight you've named around certain work, your 90-day ambitions. A system holding that is only acceptable if the knowledge stays *yours*. That constraint shaped the architecture from the first line, not as a track requirement bolted on later: task data never leaves the machine, memory is consent-gated and one-click erasable, and the only outbound call is to the language model — with *derived* context, never your raw files. Security here is enforced, not claimed.
+Every to-do app is a better place to *write down* what you should do. None of them know *why you don't do it.* You've known for two weeks you should start the interview prep. The gap isn't information — it's **behavior**.
 
-## Why an agent — and why several
+And behavior leaves a trail: which tasks you postpone, **how many times**, the small reason you mutter when you push a deadline, how long a task *really* takes versus your guess. **No tool reads that trail back to you.** Meanwhile every AI assistant bolted onto a to-do app gives the same hollow advice — *"break it into smaller steps!"* — because it only knows what you **typed**, never what you **did**.
 
-This isn't a script. The input is a fuzzy human goal ("prepare for the Microsoft Explore interview") or a fuzzy question ("why do I keep avoiding this?"), and the right response depends on messy, evolving personal data. That's an agent's job: *reason over tools and data, decide what to fetch, and act* — while refusing to do things it shouldn't. Nova is deliberately **multi-agent**, for three concrete reasons:
+**Nova's bet:** advice grounded in your real behavior beats motivation grounded in nothing.
 
-1. **Least privilege.** The Coach and Briefing agents are **read-only** — they literally cannot see a write tool, so a "why am I failing?" request can *never* mutate your board. Only the Planner writes, and only after you confirm.
-2. **Distinct voice per discipline.** The Coach's "name the mechanism, no cheerleading" instruction and the Planner's "respect the load, size up not down" discipline are different jobs that degrade when fused into one prompt.
-3. **A loop that compounds.** The Pattern agent writes weekly insights; the Coach reads them. The Reflection agent writes memory at session end; the Greeting agent reads it to open tomorrow. The system sharpens with use.
-
-## The foundation: a real product, not a demo
-
-Nova sits on **TaskFlow v9.1.0** — a shipped, 100%-offline behavioral task manager I built first. It already records, per task: priority, soft/hard deadlines, duration estimates vs. actual focus time, postpone counts, and — crucially — an **append-only `edit_history`** that captures *the reason the user gave when they moved a deadline* ("I haven't been able to start it yet", "ran out of evening again"). That field is the difference between coaching that's invented and coaching that's **true**. Nova doesn't guess your patterns; it reads them.
+---
 
 ## What Nova does
 
-- **Cites evidence, not vibes.** *"Your #study tasks are postponed 4× on average with a 0.2 completion rate — that's not a discipline gap, it's the signature of tasks too large to start."*
-- **Plans that wait for your sign-off.** Ask it to plan a goal and it *proposes* an editable set of tasks — adjust priority, duration, deadline, delete any — and nothing is written until you click Confirm. This is implementation-intention theory in practice (Gollwitzer & Sheeran, 2006): review and commitment is where follow-through is built.
-- **Coaches like a colleague who read the research.** Three beats, every time — the pattern (a real number), the mechanism, one concrete next step:
+| | Capability | What it actually means |
+|:--:|:--|:--|
+| 🔍 | **Reads evidence, not the list** | Every claim cites a real number from your history — never a guess |
+| ✅ | **Plans that wait for your sign-off** | Proposes editable tasks; **nothing is written until you confirm** |
+| 🧭 | **Coaches like a colleague who read the research** | Pattern → mechanism → one small next step. No cheerleading, no emoji, no invented stats |
+| ⚙️ | **Runs your board from chat** | Complete, schedule, postpone, drop — with TaskFlow's psychology intact (drop asks first, record preserved) |
+| 🛰️ | **Commands a second agent system** | Launches the Opportunity Hunter pipeline on request, reads its health, turns finds into scheduled tasks |
+| 🧠 | **Remembers you across sessions** | Consent-gated, local, erasable. Continuity, not surveillance |
+| ✦ | **Knows you from question one** | A 7-question psychological onboarding **+ optional import** from your other AI |
 
-  > *"Your completion rate is 0.2. Tasks tagged #course are postponed 4 times on average. This is the Zeigarnik effect: an unstarted task creates a mental open loop that drains focus. The stated reasons — 'haven't been able to start it yet' and 'ran out of evening' — confirm the tasks feel too large to begin. Break the next one into a single 15-minute first step, and schedule only that."*
+### The onboarding is psychology, not a form
+An agent that's going to coach you has to understand you first. Nova's 7-question onboarding is built on behavioral science: **positively-framed** questions (Ferrari, 2018) for honest self-report, **operational kept separate from relational** (Tzeng & Liu, 2015) so deep answers stay deep, and **an ending that's proof, not a question** (McBreen & Jack, 2001) — Nova quotes your *verbatim* 90-day purpose back to you. And because many users arrive after months with another AI, an **optional import** lets you paste what ChatGPT, Claude, Gemini, or Perplexity already knows about you (Nova supplies a tailored prompt per model) and **pre-fills the 7 questions** for you to confirm.
 
-  It quoted the user's *own* deadline-change reasons. That's the whole thesis in one paragraph — judgment-free, no cheerleading, no invented numbers; if the data is thin, it says so.
-- **Remembers you across sessions** — consent-gated, locally stored, visible and erasable in the UI. Continuity, not surveillance.
-- **Scouts opportunities** — surfaces real, scored hackathons/competitions and turns any into a planned task in one click.
+---
 
-## The onboarding: psychology, not a form
+## Architecture — one implementation, two front doors
 
-A concierge that's going to coach you has to *understand* you first. Nova opens with a seven-question psychological onboarding, designed against behavioral-science constraints rather than UX convention: **positively-framed** procrastination items (Ferrari, 2018) improve self-report accuracy; **operational and relational questions are kept separate** (Tzeng & Liu, 2015) so the deep answers stay deep; and **the ending is proof, not a question** (McBreen & Jack, 2001) — immediately after the last question, Nova quotes the user's *verbatim* 90-day purpose back to them. And because many arrive having spent months with another AI, an **optional import** lets them paste what ChatGPT, Claude, Gemini, or Perplexity already knows about them (Nova supplies a tailored prompt per model) and **pre-fills the seven questions** for confirmation — turning cold decisions into quick ones.
-
-## Architecture
+[IMAGE: architecture — screenshot the rendered diagram from the GitHub README, or generate from the prompt in chat]
 
 ```
-You → Web Console (FastAPI, localhost) or CLI
-        │
-   Orchestrator  (ADK root agent — least-privilege router)
-     ├─ Briefing  (read-only)            "what now?"
-     ├─ Planning  (write after confirm)  "goal → tasks"
-     └─ Coach     (read-only)            "why do I stall?"
-
-   Supporting agents (invoked by the console):
-     Greeting · Profile · Reflection · Pattern Intelligence
-
-   All agents → NovaTools (one implementation)
-                 ├─ in-process (default, fast)
-                 └─ MCP server · stdio · 11 typed tools
-                          │
-                ~/.taskflow  (tasks · memory · profile · insights)
+You → Web Console / CLI → Orchestrator (ADK router, least-privilege)
+        ├─ Briefing  (read-only)            "what now?"
+        ├─ Planning  (write after confirm)  "goal → tasks"
+        ├─ Coach     (read-only)            "why do I stall?"
+        ├─ Operator  (board management)     "done / postpone / drop / prime"
+        └─ Scout     (pipeline command)     "find opportunities / run a hunt"
+   + supporting agents: Greeting · Profile · Reflection · Pattern Intelligence
+        ↓ all call → NovaTools (one implementation)
+            • in-process (fast default)
+            • MCP server · stdio · 17 typed tools  → external clients
+        ↓ ~/.taskflow  (tasks · memory · profile · insights)
+        ↓ HunterBridge → Opportunity Hunter (a second, independent agent system)
    NovaTools ┄(derived context, consent-gated)┄→ Gemini API
 ```
 
-**Eight agents.** The Orchestrator routes to three least-privilege conversation specialists; four supporting agents handle the relational layer (a Greeting agent that opens each session, a Profile agent that runs onboarding, a Reflection agent at session end, and a Pattern Intelligence agent for multi-week analysis). The Greeting agent deliberately uses a **single fast model call** rather than a tool loop — it fires every session start, so the data (profile + recent memory + today's context) is assembled deterministically and passed in one shot to spare the free-tier budget.
+**The seam that matters: logic vs. transport.** All capability lives in one class, `NovaTools`, returning typed Pydantic models — exposed **two ways from the same code**: in-process to the agents (the reliable default), and over a real **MCP server on stdio** (17 typed tools) that external clients (Claude Desktop, other ADK systems) can connect to. With `nova ask --mcp`, the agents themselves pull tools from the live MCP subprocess — so MCP is **load-bearing, not a checkbox** — and each agent's least-privilege tool list is enforced **even over MCP.**
 
-**One implementation, two front doors** — the seam that matters. All capability lives in one class, `NovaTools`, returning typed Pydantic models, exposed two ways from the *same* code: in-process to the agents (the reliable default), and over a real **MCP server on stdio** (11 typed tools) that external clients — Claude Desktop, other ADK systems — can connect to. With `nova ask --mcp` the agents themselves pull their tools from the live MCP subprocess, so MCP is load-bearing, not a checkbox — and the read-only/write split is enforced **per agent even over MCP**. The 11 tools: `get_tasks`, `get_today_context`, `get_behavioral_stats`, `get_edit_history`, `get_opportunities`, `recall_memory` (read); `create_task`, `complete_task`, `schedule_task`, `set_prime_target`, `remember` (write/validated/audited).
+### The 10 agents
 
-**Quota-aware routing.** Complex modes (Plan, Coach) try the most capable Gemini model first; simple modes start cheap. On a `429`, that model is marked exhausted for the session and the router silently falls back — a user never sees a quota error unless every tier is down.
+| Agent | Trigger | Reads | Writes / Acts |
+|:--|:--|:--|:--|
+| **Orchestrator** | every message | intent | routes to one specialist |
+| **Briefing** | "what now?" / daily cron | live load, prime target, overdue | — |
+| **Planning** | "turn this goal into tasks" | current load, behavioral tags | creates tasks (after you confirm) |
+| **Coach** | "why do I keep avoiding this?" | postpone patterns, edit reasons, insights | — |
+| **Operator** | "mark 3 done" / "postpone 5 to Friday" / "drop it" | the board + cloud-sync state | complete · schedule · postpone · soft-drop *(asks first)* · prime |
+| **Scout** | "find opportunities" / "run a hunt" | Hunter feed + pipeline health | launches hunts · opportunity → task |
+| **Greeting** | every session start | profile + recent memory | — *(single fast call, quota-frugal)* |
+| **Profile** | onboarding (once) | 7 answers + optional AI import | `user_profile.json` |
+| **Reflection** | "End session" | today's activity | 2–3 memory notes |
+| **Pattern Intelligence** | weekly | 4 weeks of behavior | `nova_insights.json` *(Coach reads it)* |
 
-## Course concepts demonstrated (the capstone asks for ≥3; Nova has 6)
+**Why multi-agent, not one big prompt?** Three concrete reasons: **least privilege** (Coach literally cannot see a write tool, and only the Operator can complete, postpone, or drop — a "why am I failing?" request can never mutate your data), **distinct voice per discipline**, and **a feedback loop that compounds** (Pattern writes insights → Coach cites them; Reflection writes memory → Greeting opens with it).
 
-| Concept | Where |
+---
+
+## The part most agents don't have: agents that command agents
+
+Most "multi-agent" submissions are one brain wearing several prompts. Nova crosses a harder line: **it commands a separate agent system that existed before Nova did.**
+
+The **Opportunity Hunter** is its own project — an 11-source scraping + LLM-scoring pipeline (Devpost, MLH, GitHub, arXiv, coding contests…) that hunted hackathons, internships, and fellowships on a daily schedule, alone, for weeks. Nova's **Scout** agent now commands it in conversation: *"run a fresh hunt"* launches the pipeline as a **detached process** (a real hunt takes minutes — Scout says so instead of pretending), *"is it working?"* reads the pipeline's own output for last-run health, and *"add that one"* turns a scored find into a scheduled TaskFlow task, deadline and all. The coupling is **data + process, never imports** — either project can be rebuilt freely without breaking the other, and without the Hunter installed, Scout **degrades honestly** to the bundled demo feed and says so.
+
+The **Operator** agent (named for TaskFlow's own "OPERATOR M" persona) is Nova's hands on the board: complete, schedule, postpone, drop — from chat. It carries TaskFlow's psychology *into* the agent layer: a drop needs your explicit confirmation and **preserves the behavioral record** (soft-drop, never a hard delete — "rescue, not punishment"), and a postpone updates the same honest postpone-count mirror TaskFlow shows you. It even knows whether your cloud backup is fresh.
+
+That is the real shape of the system: **one intelligence layer that knows and commands an execution engine (TaskFlow) and a discovery engine (the Hunter) — a personal AI OS in miniature.**
+
+### The 17 MCP tools
+`get_tasks` · `get_today_context` · `get_behavioral_stats` · `get_edit_history` · `get_opportunities` · `recall_memory` · `get_hunter_status` · `get_sync_status` *(read)* — `create_task` · `complete_task` · `schedule_task` · `set_prime_target` · `postpone_task` · `drop_task` · `run_opportunity_hunt` · `sync_taskflow` · `remember` *(write/act, validated + audited)*
+
+---
+
+## Course concepts — 6 of 6 (only 3 required)
+
+| Concept | Where it lives |
 |:--|:--|
-| **Multi-agent (ADK)** | Orchestrator + 3 least-privilege sub-agents + 4 supporting agents |
-| **MCP Server** | 11 typed tools over stdio; same implementation in-process and over the protocol |
-| **Security** | No network surface · path containment · consent-gated LLM boundary · audit log · fail-closed validation |
-| **Deployability** | A GitHub Action runs the read-only Briefing agent on a schedule; green with or without a key |
-| **Agent Skills** | `SKILL.md` — when to invoke Nova, its tools, voice, and security model |
-| **Antigravity** | Nova was vibe-coded in Antigravity — shown in the demo video |
+| ✅ **Multi-agent (ADK)** | Orchestrator + 5 least-privilege sub-agents + 4 supporting agents — including two that command external systems |
+| ✅ **MCP Server** | 17 typed tools over stdio — same implementation in-process *and* over the protocol |
+| ✅ **Security** | No network surface, path containment, consent-gated LLM boundary, audit log |
+| ✅ **Deployability** | GitHub Action runs the read-only Briefing on a schedule; green with or without a key |
+| ✅ **Agent Skills** | A `SKILL.md` defining when to invoke Nova, its tools, voice, and security model |
+| ✅ **Antigravity** | Nova was vibe-coded in Antigravity (shown in the demo video) |
 
-## Security (a Concierge-track first-class concern)
+---
 
-Many submissions will claim "no data leaves your machine" while calling a cloud LLM. That isn't true, and a careful judge can disprove it. Nova states the boundary honestly and enforces it:
+## Security — the bar Nova holds (enforced, not claimed)
 
-- **No network surface** — MCP runs over **stdio**, no socket; the console binds to `127.0.0.1` only.
-- **Path containment** — every read/write is `realpath` + `commonpath` verified inside the data dir; traversal blocked.
-- **Fail-closed validation** — every value crossing into a write is sanitized through TaskFlow's own normalizers.
-- **Audit + live consent** — every write is appended to a local audit log; richer behavioral data is read only when the `nova_data_enabled` toggle is on, and that gate is re-checked **live** on every memory access (not frozen at startup).
-- **Honest LLM boundary** — files never leave the machine; only the *derived* context an agent needs is sent to Gemini.
-- **No secrets in code** — the key comes from a gitignored `.env`; the repo ships only a placeholder template.
+| Guarantee | How |
+|:--|:--|
+| **No network surface** | MCP runs over **stdio** — no socket, no port. Console binds to `127.0.0.1` only |
+| **Path containment** | Every file access is `realpath` + `commonpath` checked — traversal blocked |
+| **Honest LLM boundary** | Raw files never leave the machine; only *derived* context is sent to Gemini, and consent is re-checked **live** on every memory access |
+| **Least privilege** | Read-only agents cannot see write tools |
+| **Audit + fail-closed** | Every write is logged; all write inputs are sanitized through validators |
+| **No secrets in code** | Key from a gitignored `.env`; the repo ships only a placeholder template |
 
-## Evaluation, deployability, and frictionless setup
+---
 
-- **Reproducible eval:** `eval/run_eval.py` checks the behavioral derivations, the overdue ranking, and MCP least-privilege; with a key it also verifies the live Coach grounds its answer in real numbers and never cheerleads.
-- **Deployability:** a GitHub Action runs the read-only Briefing agent every morning and writes the brief to the run summary, using a committed sanitized sample so it stays green without exposing real data.
-- **Zero-config setup:** a tool a judge can't run is a tool a judge can't reward. Nova **self-seeds demo data on first run** (never clobbering a real install) and ships a one-command setup that installs and opens the console — no separate dependencies, no API key required just to explore the architecture and the live data grounding.
+## Built on a real product, not a demo
+
+Nova didn't start from zero. It sits on **TaskFlow v9.1.0** — a shipped, 100%-offline behavioral task manager — so Nova's "dataset" is **real usage**, not a fixture: genuine postpone counts, actual durations vs. estimates, and an **append-only `edit_history` that captures the reason you gave when you moved a deadline** ("haven't been able to start it yet", "ran out of evening"). That single field is the difference between coaching that's *invented* and coaching that's **true**. Nova doesn't guess your patterns — it reads them.
+
+---
 
 ## The build — and the discipline behind it
 
-Nova didn't start from zero; it sits on TaskFlow, a behavioral engine I'd already shipped, which means its "dataset" is real usage — genuine postpone counts, real deadline-change reasons, actual durations vs. estimates. That foundation is what lets the Coach cite numbers instead of guessing.
+The most instructive moment wasn't a feature — it was **honesty under pressure**. An early draft claimed a *"fully offline, zero-cloud"* mode the code didn't implement. In a track judged partly on security and code, a claim a reviewer can falsify by reading one file is a liability — so it was cut. The honest reframe (local-first *data*, derived-context-only to the model, consent-gated) is **both more truthful and a stronger story.** The same discipline produced a live-checked consent gate, a three-tier data-reset flow with honest confirmations, and a dead-code audit. An agent handling personal data has to be **trustworthy first** — and trustworthy means the claims match the code.
 
-The most instructive moment in the build was a **course-correction in honesty**. An early plan claimed a "fully offline, zero-cloud" mode the code didn't actually implement. In a track judged partly on security and code, a claim a reviewer can falsify by reading one file is a liability — so it was cut. The honest reframe — local-first *data*, derived-context-only to the model, consent-gated — is both more truthful and a stronger security story. The same discipline produced the live-checked consent gate (a bug freezing consent at startup was found and fixed), a three-tier data-reset flow with honest, count-aware confirmations, and a dead-code audit. A concierge handling personal data has to be *trustworthy first*, and trustworthy means the claims match the code. Nova was vibe-coded in **Antigravity**.
+---
 
-## Who it's for, and what makes it real
+## Try it — genuinely one command
 
-Nova is for the person whose problem was never *making the list* — students, builders, knowledge workers rewriting the same overdue task. The coaching is true because the data is true: Nova isn't an LLM imagining your habits, it's an agent reading a behavioral dataset a real product has been keeping, and reflecting it back in a voice engineered not to make you feel judged — all without handing your personal data to the cloud.
+Nova **self-seeds a demo board on first run** (without ever touching a real install), so there's nothing else to set up — **no separate TaskFlow install, no API key needed just to explore** the console, the live data grounding, and the architecture.
 
-## Honest limitations and what's next
+```bash
+# Windows
+git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova && cd nova && setup.bat
 
-Nova's intelligence depends on Gemini; the free-tier daily quota is the main practical limit, which the router manages but can't eliminate. The Pattern Intelligence agent is wired and callable but not yet surfaced with its own UI. The richest version of Nova is the **digital-twin** direction — smart duration estimation from history, implementation-intention capture at the moment of planning, a proactive brief that reaches out before you ask. The hooks are already in place.
+# macOS / Linux
+git clone https://github.com/Mohith535/Nova-agentic-layer-over-taskflow.git nova && cd nova && bash setup.sh
+```
 
-TaskFlow gave you the execution engine. **Nova gives it a brain.**
+The browser opens at the console with sample data already loaded. Add a free Gemini key only to switch the live AI agents on.
+
+---
+
+## Honest limitations & what's next
+
+Nova's intelligence depends on Gemini; the free-tier daily quota is the main practical limit (the quota-aware router manages it, but can't eliminate it). The Pattern Intelligence agent is wired and callable but not yet surfaced with its own UI. The Opportunity Hunter is the author's local pipeline — judges see the bundled demo feed, with Scout saying so honestly. The richest version of Nova is the **digital-twin** direction — smart duration estimation from history, implementation-intention capture at the moment of planning, a proactive brief that reaches out before you ask. The hooks are already in place.
+
+---
+
+**TaskFlow gave you an execution engine. The Hunter gave you a discovery engine. Nova is the mind that runs them both — on *your* data, on *your* machine, for *you*.**
