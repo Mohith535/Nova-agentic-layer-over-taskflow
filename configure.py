@@ -20,12 +20,14 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 NOVA_DIR = Path(__file__).resolve().parent
 HOME = Path.home()
 TASKFLOW_DIR = HOME / ".taskflow"
+HUNTER_REPO = "https://github.com/Mohith535/opportunity-hunter.git"
 
 
 # ── env-file helpers ────────────────────────────────────────────────────────
@@ -100,6 +102,57 @@ def section(title: str) -> None:
     print("─" * 60)
 
 
+def offer_hunter(wrote: list[str]) -> Path | None:
+    """Describe the Opportunity Hunter and, if the user wants it, clone + install + link it
+    to Nova. Returns its path (so the caller can configure its keys), or None if declined.
+    Optional and personal — most users skip it, so it is never installed without a yes."""
+    section("2. OPPORTUNITY HUNTER  ·  optional add-on")
+    print("  A separate agent that scans ~11 sources every day (Devpost, MLH, GitHub, arXiv,")
+    print("  coding contests, Reddit…) for hackathons, internships, fellowships and research —")
+    print("  scores each 1-10 against your profile and pushes the best to your phone and your")
+    print("  task board. Nova's Scout agent commands it from chat.")
+    print("  It's optional and personal — most people can safely skip it.")
+    try:
+        ans = input("\n  Set up the Opportunity Hunter now? (y/N): ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if ans not in ("y", "yes"):
+        print("  Skipped. Re-run `python configure.py` any time to add it.")
+        return None
+
+    if not shutil.which("git"):
+        print("  ! git isn't on PATH — install Git, then re-run `python configure.py`. Skipping.")
+        return None
+
+    target = NOVA_DIR.parent / "opportunity-hunter"
+    if target.exists() and (target / "main.py").exists():
+        print(f"  Using existing folder: {target}")
+    else:
+        print(f"  Cloning into {target} …")
+        try:
+            rc = subprocess.run(["git", "clone", "--depth", "1", HUNTER_REPO, str(target)]).returncode
+        except Exception as e:
+            print(f"  ! Clone failed ({e}). Skipping — you can clone it manually later."); return None
+        if rc != 0 or not (target / "main.py").exists():
+            print("  ! Clone did not complete. Skipping."); return None
+
+    reqs = target / "requirements.txt"
+    if reqs.exists():
+        print("  Installing the Hunter's dependencies (this can take a minute) …")
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(reqs)])
+        except Exception as e:
+            print(f"  ! Dependency install hit a snag ({e}); you can run it later. Continuing.")
+
+    # Tell Nova where the Hunter is AND which interpreter can run it (this venv now has its
+    # deps, so point NOVA_HUNTER_PYTHON at ourselves — robust across machines).
+    set_key(NOVA_DIR / ".env", "NOVA_HUNTER_ROOT", str(target))
+    set_key(NOVA_DIR / ".env", "NOVA_HUNTER_PYTHON", sys.executable)
+    wrote.append("Opportunity Hunter — cloned, installed, linked to Nova")
+    print("  ✓ Opportunity Hunter installed and linked to Nova's Scout agent.")
+    return target
+
+
 def main() -> int:
     print("\n" + "=" * 60)
     print("  NOVA — CONFIGURATION WIZARD")
@@ -124,8 +177,10 @@ def main() -> int:
         set_key(nova_env, "GEMINI_API_KEY", v)
         wrote.append("Nova .env — Gemini key")
 
-    # 2) OPPORTUNITY HUNTER — only if it's installed alongside Nova
+    # 2) OPPORTUNITY HUNTER — detect it, or OFFER to install it (optional & personal)
     hunter = find_hunter()
+    if not hunter:
+        hunter = offer_hunter(wrote)
     if hunter:
         section(f"2. OPPORTUNITY HUNTER  ·  {hunter.name}")
         h_env = hunter / ".env"
@@ -145,9 +200,6 @@ def main() -> int:
         v = prompt("Telegram chat id", "Message your bot /start after running: python telegram_listener.py", read_key(h_env, "TELEGRAM_CHAT_ID"))
         if v:
             set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
-    else:
-        section("2. OPPORTUNITY HUNTER  ·  not detected — skipping")
-        print("  (Set NOVA_HUNTER_ROOT or place it beside Nova, then re-run to configure it.)")
 
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
     section("3. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")

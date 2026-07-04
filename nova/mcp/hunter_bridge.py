@@ -37,6 +37,11 @@ def _hunter_python() -> list[str]:
     """
     override = os.environ.get("NOVA_HUNTER_PYTHON")
     if override:
+        # A full path to an interpreter (possibly with spaces, e.g. a venv under
+        # "C:\Users\John Doe\...") must stay one token; only split multi-word launchers
+        # like "py -3.12".
+        if Path(override).is_file():
+            return [override]
         return override.split()
     if sys.platform == "win32":
         return ["py", "-3.12"]
