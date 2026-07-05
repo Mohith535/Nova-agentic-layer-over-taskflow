@@ -101,7 +101,8 @@ Handy extras: **`run.bat`** / `bash run.sh` reopens Nova after you close it. Dur
 choose whether `nova` / `taskflow` are **system-wide** (type them in any terminal) or **isolated**
 to this folder (zero system footprint — just delete the folder to fully remove) · `python
 configure.py` re-runs the key wizard · `reset.bat` / `bash reset.sh` wipes the install back to a
-clean state for re-testing.
+clean state for re-testing · **`uninstall.bat`** / `bash uninstall.sh` cleanly removes Nova and/or
+its companions (and, only if you ask, your data — kept by default).
 </details>
 
 No accounts. No telemetry. Your task data stays on your machine — only derived, consent-gated context ever reaches Gemini.
