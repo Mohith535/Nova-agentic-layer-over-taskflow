@@ -34,12 +34,19 @@ echo [3/4] Configuring your keys (interactive - press Enter to skip any)...
 echo.
 python configure.py
 
-echo [4/4] Launching the Nova console...
+echo [4/4] Setup complete - opening Nova...
 echo.
-echo   The browser will open at http://127.0.0.1:8765
-echo   Demo data is loaded automatically - no API key required to explore.
+echo ============================================================
+echo   Nova is installed and ready. The console opens at
+echo   http://127.0.0.1:8765  (demo data loads automatically).
 echo.
-echo   TO OPEN NOVA AGAIN LATER: double-click run.bat  (or:  run.bat  in this folder).
-echo   The 'nova' command only works inside this folder's environment - run.bat handles that.
+echo   Press Ctrl+C to stop the console - THIS WINDOW STAYS OPEN
+echo   and ready, so you can then run any of these right here:
+echo       nova web        open the console again
+echo       nova doctor     health check - verifies key, data, Hunter
+echo       nova ask "hi"   ask Nova anything
+echo ============================================================
 echo.
-nova web
+REM Hand off to an interactive shell that already has the venv active, then run the
+REM console in it. Ctrl+C stops the console but keeps this shell ready for nova commands.
+cmd /k nova web
