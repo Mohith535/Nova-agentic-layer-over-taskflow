@@ -9,7 +9,7 @@ setlocal
 where python >nul 2>nul
 if errorlevel 1 (
   echo Python is not on PATH. Install Python 3.11+ from https://python.org and re-run.
-  echo (During install, tick "Add Python to PATH".)
+  echo During install, remember to tick "Add Python to PATH".
   exit /b 1
 )
 
