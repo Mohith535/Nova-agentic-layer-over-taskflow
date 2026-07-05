@@ -178,7 +178,7 @@ def offer_taskflow(wrote: list[str]) -> None:
 
     print("  Installing TaskFlow — this gives you the 'taskflow' command …")
     try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(target)])
+        subprocess.run([_venv_python(), "-m", "pip", "install", "-q", "-e", str(target)])
     except Exception as e:
         print(f"  ! Install hit a snag ({e}); you can run it later. Continuing.")
         return
@@ -224,17 +224,119 @@ def offer_hunter(wrote: list[str]) -> Path | None:
     if reqs.exists():
         print("  Installing the Hunter's dependencies (this can take a minute) …")
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(reqs)])
+            subprocess.run([_venv_python(), "-m", "pip", "install", "-q", "-r", str(reqs)])
         except Exception as e:
             print(f"  ! Dependency install hit a snag ({e}); you can run it later. Continuing.")
 
     # Tell Nova where the Hunter is AND which interpreter can run it (this venv now has its
     # deps, so point NOVA_HUNTER_PYTHON at ourselves — robust across machines).
     set_key(NOVA_DIR / ".env", "NOVA_HUNTER_ROOT", str(target))
-    set_key(NOVA_DIR / ".env", "NOVA_HUNTER_PYTHON", sys.executable)
+    set_key(NOVA_DIR / ".env", "NOVA_HUNTER_PYTHON", _venv_python())
     wrote.append("Opportunity Hunter — cloned, installed, linked to Nova")
     print("  ✓ Opportunity Hunter installed and linked to Nova's Scout agent.")
     return target
+
+
+# ── isolated-vs-global commands ─────────────────────────────────────────────
+
+def _venv_python() -> str:
+    """The interpreter that actually has the deps — prefer THIS repo's venv over whatever
+    python happens to be running us. Then installs and helper scripts always hit the right
+    environment, even when configure.py is re-run from a plain (non-activated) terminal."""
+    cand = NOVA_DIR / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    return str(cand) if cand.exists() else sys.executable
+
+
+def _installed_commands() -> list[str]:
+    """Console commands that actually exist in the venv (nova always; taskflow if installed)."""
+    scripts = Path(_venv_python()).parent
+    found = []
+    for name in ("nova", "taskflow"):
+        exe = scripts / (f"{name}.exe" if os.name == "nt" else name)
+        if exe.exists():
+            found.append(name)
+    return found
+
+
+def _install_global_shims(cmds: list[str]) -> bool:
+    """Drop a thin launcher for each command onto the user's PATH so it works in any terminal.
+    The launcher just calls the real command inside the isolated venv — nothing is copied or
+    installed system-wide, so this stays clean and fully reversible (delete the shim to undo)."""
+    scripts = Path(_venv_python()).parent
+    made: list[str] = []
+    if os.name == "nt":
+        # WindowsApps is already on the default user PATH — dropping a .cmd there needs no PATH
+        # surgery (setx truncates PATH; a corrupted PATH before a demo is unforgivable). Fall
+        # back to a private bin dir only if WindowsApps somehow isn't present.
+        appdir = Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData" / "Local")))
+        target = appdir / "Microsoft" / "WindowsApps"
+        if not target.is_dir():
+            target = HOME / ".nova" / "bin"
+            target.mkdir(parents=True, exist_ok=True)
+        for name in cmds:
+            try:
+                # Use \n and let write_text translate to the platform newline once — writing
+                # \r\n here would get re-translated to \r\r\n (a stray CR in the .cmd).
+                (target / f"{name}.cmd").write_text(
+                    f'@echo off\n"{scripts / (name + ".exe")}" %*\n', encoding="utf-8")
+                made.append(name)
+            except OSError as e:
+                print(f"  ! Couldn't add the {name} shortcut ({e}).")
+    else:
+        target = HOME / ".local" / "bin"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in cmds:
+            try:
+                shim = target / name
+                shim.write_text(f'#!/bin/sh\nexec "{scripts / name}" "$@"\n', encoding="utf-8")
+                shim.chmod(0o755)
+                made.append(name)
+            except OSError as e:
+                print(f"  ! Couldn't add the {name} shortcut ({e}).")
+    if not made:
+        return False
+    on_path = str(target).lower() in os.environ.get("PATH", "").lower()
+    print(f"  ✓ Done — open a NEW terminal and type  {'  or  '.join(made)}  from anywhere.")
+    if not on_path:
+        if os.name == "nt":
+            print(f"    If it isn't found, add this one folder to your PATH:  {target}")
+        else:
+            print("    Add this line to ~/.bashrc or ~/.zshrc, then reopen the terminal:")
+            print(f'        export PATH="{target}:$PATH"')
+    return True
+
+
+def offer_global_commands() -> bool:
+    """Let the user choose how to reach the commands: keep them ISOLATED (zero system footprint —
+    the safe pick for anyone evaluating) or make them SYSTEM-WIDE (convenient for daily use).
+    Returns True if made global. Isolated is the default because 'undo = delete the folder' is
+    the least-scary promise you can make to someone installing a stranger's software."""
+    cmds = _installed_commands()
+    if not cmds:
+        return False
+    names = "  /  ".join(cmds)
+    section("5. RUNNING THE COMMANDS  ·  isolated or system-wide")
+    print("  Nova installed into a private environment inside this folder — that's exactly what")
+    print("  keeps the rest of your computer untouched. One choice left: how do you want to")
+    print(f"  reach the  {names}  command(s)?")
+    print()
+    print("     [Enter]  Isolated   —   best for trying Nova out")
+    print("              The commands live only inside this folder. Nothing is added to your")
+    print("              system; to remove Nova completely you just delete the folder.")
+    print("              Re-open the console anytime with  run.bat  /  bash run.sh.")
+    print()
+    print("     g        System-wide   —   best for everyday use")
+    print(f"              Type  {names}  in ANY terminal, anywhere. The program still lives")
+    print("              safely in its isolated environment — we only place a tiny shortcut on")
+    print("              your PATH that points to it. Fully reversible.")
+    try:
+        ans = input("\n  Enter for isolated, or 'g' for system-wide: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    if ans not in ("g", "global", "s", "system", "y", "yes"):
+        print("  Keeping it isolated — zero footprint. Launch with  run.bat  /  bash run.sh.")
+        return False
+    return _install_global_shims(cmds)
 
 
 def main() -> int:
@@ -311,8 +413,10 @@ def main() -> int:
         if v:
             set_key(h_env, "TELEGRAM_BOT_TOKEN", v); wrote.append("Hunter .env — Telegram token")
         v = prompt("Telegram chat id",
-                   f'Send /start to your bot, then run this (it prints your id — Ctrl+C after):\n'
-                   f'          python "{hunter / "telegram_listener.py"}"',
+                   'Send /start to your bot, then paste-and-run this ONE line (it prints your\n'
+                   '      id — press Ctrl+C after it appears). Use the full path shown — it points at\n'
+                   "      Nova's environment, which has the Hunter's dependencies installed:\n"
+                   f'          "{_venv_python()}" "{hunter / "telegram_listener.py"}"',
                    read_key(h_env, "TELEGRAM_CHAT_ID"))
         if v:
             set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
@@ -337,10 +441,12 @@ def main() -> int:
             if go in ("y", "yes"):
                 print("\n  Confirmation run in progress — this can take a minute…\n")
                 try:
-                    subprocess.run([sys.executable, "main.py", "--test"], cwd=str(hunter))
+                    subprocess.run([_venv_python(), "main.py", "--test"], cwd=str(hunter))
                     print("\n  ✓ A brief with 'scanned / relevant / new' counts above means the Hunter works.")
                 except Exception as e:
-                    print(f"  ! Couldn't run it here ({e}). Try directly: cd {hunter} && python main.py --test")
+                    print(f'  ! Couldn\'t run it here ({e}). Try directly:\n'
+                          f'        cd "{hunter}"\n'
+                          f'        "{_venv_python()}" main.py --test')
 
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
     section("4. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
@@ -365,6 +471,9 @@ def main() -> int:
     if repo and hunter:
         set_key(hunter / ".env", "TASKFLOW_SYNC_REPO", repo)
         wrote.append("Hunter .env — sync repo")
+
+    # 5) HOW TO RUN — isolated (evaluator-safe, zero footprint) vs system-wide (daily use)
+    went_global = offer_global_commands()
 
     # summary — never echo the secrets themselves
     print("\n" + "=" * 62)
@@ -391,7 +500,13 @@ def main() -> int:
     if hunter:
         print(f"      {4 if taskflow_installed else 3}. The Opportunity Hunter is linked — ask Nova's 'Scout' to find or run a hunt.")
     print("\n  Change or add any key later, any time:   python configure.py")
-    print("  Open Nova again after closing it:         run.bat   (Windows)  ·  bash run.sh")
+    if went_global:
+        print("  Commands are system-wide — in any NEW terminal you can run:")
+        print("      nova web        open the console       ·   nova doctor   health check")
+        if taskflow_installed:
+            print("      taskflow today  your task board")
+    else:
+        print("  Open Nova again after closing it:         run.bat   (Windows)  ·  bash run.sh")
     print("=" * 62 + "\n")
     return 0
 
