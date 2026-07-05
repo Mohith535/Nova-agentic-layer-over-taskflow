@@ -28,6 +28,7 @@ NOVA_DIR = Path(__file__).resolve().parent
 HOME = Path.home()
 TASKFLOW_DIR = HOME / ".taskflow"
 HUNTER_REPO = "https://github.com/Mohith535/opportunity-hunter.git"
+TASKFLOW_REPO = "https://github.com/Mohith535/TaskFlow.git"
 
 
 # ── env-file helpers ────────────────────────────────────────────────────────
@@ -142,11 +143,54 @@ def section(title: str) -> None:
     print("─" * 60)
 
 
+def offer_taskflow(wrote: list[str]) -> None:
+    """Offer to install the TaskFlow CLI — the behavioral task manager Nova is built on.
+    Optional: Nova runs on demo data without it; install it to manage a real board and
+    get the 'taskflow' command. Installs into the current venv (deps are light, no conflict)."""
+    section("2. TASKFLOW CLI  ·  optional add-on")
+    print("  TaskFlow is the behavioral task manager Nova is built on — a command-line app")
+    print("  (plus a local dashboard) for capturing and running your tasks. Nova reads its")
+    print("  data to coach you. Install it to manage a REAL board instead of the bundled demo.")
+    print("  Optional — Nova works great on demo data without it.")
+    try:
+        ans = input("\n  Install the TaskFlow CLI now? (y/N): ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return
+    if ans not in ("y", "yes"):
+        print("  Skipped. You can add it later by re-running  python configure.py.")
+        return
+
+    if not shutil.which("git"):
+        print("  ! git isn't on PATH — install Git, then re-run `python configure.py`. Skipping.")
+        return
+
+    target = NOVA_DIR.parent / "taskflow"
+    if target.exists() and (target / "pyproject.toml").exists():
+        print(f"  Using existing folder: {target}")
+    else:
+        print(f"  Cloning into {target} …")
+        try:
+            rc = subprocess.run(["git", "clone", "--depth", "1", TASKFLOW_REPO, str(target)]).returncode
+        except Exception as e:
+            print(f"  ! Clone failed ({e}). Skipping — you can clone it manually later."); return
+        if rc != 0 or not (target / "pyproject.toml").exists():
+            print("  ! Clone did not complete. Skipping."); return
+
+    print("  Installing TaskFlow — this gives you the 'taskflow' command …")
+    try:
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(target)])
+    except Exception as e:
+        print(f"  ! Install hit a snag ({e}); you can run it later. Continuing.")
+        return
+    wrote.append("TaskFlow CLI — cloned + installed ('taskflow' command)")
+    print("  ✓ TaskFlow installed. Try:  taskflow today   or   taskflow dump \"a task #inbox\"")
+
+
 def offer_hunter(wrote: list[str]) -> Path | None:
     """Describe the Opportunity Hunter and, if the user wants it, clone + install + link it
     to Nova. Returns its path (so the caller can configure its keys), or None if declined.
     Optional and personal — most users skip it, so it is never installed without a yes."""
-    section("2. OPPORTUNITY HUNTER  ·  optional add-on")
+    section("3. OPPORTUNITY HUNTER  ·  optional add-on")
     print("  A separate agent that scans ~11 sources every day (Devpost, MLH, GitHub, arXiv,")
     print("  coding contests, Reddit…) for hackathons, internships, fellowships and research —")
     print("  scores each 1-10 against your profile and pushes the best to your phone and your")
@@ -213,6 +257,10 @@ def main() -> int:
      Telegram bot       act on tasks from your phone    ·  optional
      GitHub token       phone <-> cloud task sync        ·  optional
 
+  You'll also be offered two optional companion apps to install:
+     TaskFlow CLI       manage a real task board (the 'taskflow' command)
+     Opportunity Hunter scans 11 sources daily for hackathons/internships
+
   Have any handy? Enter them below. Don't have one yet? Press Enter to skip it
   and add it later, any time, by running:   python configure.py
 """)
@@ -231,12 +279,15 @@ def main() -> int:
         wrote.append("Nova .env — Gemini key")
         check_gemini(v)
 
-    # 2) OPPORTUNITY HUNTER — detect it, or OFFER to install it (optional & personal)
+    # 2) TASKFLOW CLI — optional install (the board Nova reads)
+    offer_taskflow(wrote)
+
+    # 3) OPPORTUNITY HUNTER — detect it, or OFFER to install it (optional & personal)
     hunter = find_hunter()
     if not hunter:
         hunter = offer_hunter(wrote)
     if hunter:
-        section(f"2. OPPORTUNITY HUNTER  ·  {hunter.name}")
+        section(f"3. OPPORTUNITY HUNTER  ·  {hunter.name}")
         h_env = hunter / ".env"
         ensure_from_example(h_env, hunter / ".env.example")
 
@@ -292,7 +343,7 @@ def main() -> int:
                     print(f"  ! Couldn't run it here ({e}). Try directly: cd {hunter} && python main.py --test")
 
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
-    section("3. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
+    section("4. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
     repo = prompt("Sync repo",
                   "Just  owner/name  (e.g. yourname/taskflow-sync). A full github.com URL is fine too — "
                   "I'll trim it.", "")
@@ -334,8 +385,11 @@ def main() -> int:
     else:
         print("      2. No Gemini key yet, so explore on demo data. Add one any time to")
         print("         switch the live AI on:  python configure.py")
+    taskflow_installed = any("TaskFlow CLI" in w for w in wrote)
+    if taskflow_installed:
+        print("      3. TaskFlow is installed — run  taskflow today  or  taskflow dump \"a task\".")
     if hunter:
-        print("      3. The Opportunity Hunter is linked — ask Nova's 'Scout' to find or run a hunt.")
+        print(f"      {4 if taskflow_installed else 3}. The Opportunity Hunter is linked — ask Nova's 'Scout' to find or run a hunt.")
     print("\n  Change or add any key later, any time:   python configure.py")
     print("  Open Nova again after closing it:         run.bat   (Windows)  ·  bash run.sh")
     print("=" * 62 + "\n")
