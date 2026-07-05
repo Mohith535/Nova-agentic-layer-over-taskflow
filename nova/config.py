@@ -94,7 +94,7 @@ def ensure_api_key() -> bool:
     return False
 
 
-def validate_gemini_key(key: str, timeout: float = 8.0):
+def validate_gemini_key(key: str, timeout: float = 15.0):
     """Fast liveness check for a Gemini key via a single REST call. Never raises. Returns:
       True  — the key works (HTTP 200 from the models endpoint)
       False — the key was explicitly rejected (HTTP 400 / 401 / 403 — invalid or unauthorized)
@@ -166,6 +166,7 @@ def ensure_data_dir() -> str:
 
     os.environ["TASKFLOW_DATA_PATH"] = str(target)
     if seeded:
-        print(f"[nova] No TaskFlow board found — seeded demo data into {target}", flush=True)
-        print("[nova] Explore freely; install TaskFlow to point Nova at your real board.", flush=True)
+        print(f"[nova] Seeded a demo board into {target} — Nova is ready to explore.", flush=True)
+        print("[nova] (The TaskFlow CLI is a separate, optional app; you do NOT need it. "
+              "If you already use it, Nova reads your real board automatically.)", flush=True)
     return str(target)

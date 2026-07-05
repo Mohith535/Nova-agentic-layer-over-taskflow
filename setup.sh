@@ -36,6 +36,8 @@ echo "[4/4] Launching the Nova console..."
 echo
 echo "  The browser will open at http://127.0.0.1:8765"
 echo "  Demo data is loaded automatically — no API key required to explore."
-echo "  (Re-run 'python configure.py' any time to add or change a key.)"
+echo
+echo "  TO OPEN NOVA AGAIN LATER:  bash run.sh   (from this folder)."
+echo "  The 'nova' command only works inside this folder's environment — run.sh handles that."
 echo
 nova web

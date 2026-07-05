@@ -97,8 +97,9 @@ nova ask "what's actually blocking me right now?"
 nova mcp --selftest   # works with no key — lists the 17 MCP tools
 ```
 
-Handy extras: `python configure.py` re-runs the key wizard any time · `reset.bat` /
-`bash reset.sh` wipes the install back to a clean state for re-testing.
+Handy extras: **`run.bat`** / `bash run.sh` opens Nova again after you close it (the `nova`
+command only lives inside this folder's environment) · `python configure.py` re-runs the key
+wizard · `reset.bat` / `bash reset.sh` wipes the install back to a clean state for re-testing.
 </details>
 
 No accounts. No telemetry. Your task data stays on your machine — only derived, consent-gated context ever reaches Gemini.

@@ -260,8 +260,8 @@ def main() -> int:
         if v:
             set_key(h_env, "TELEGRAM_BOT_TOKEN", v); wrote.append("Hunter .env — Telegram token")
         v = prompt("Telegram chat id",
-                   "Send /start to YOUR new bot, then run `python telegram_listener.py` in the "
-                   "Hunter folder — it prints your chat id. Paste it here.",
+                   f'Send /start to your bot, then run this (it prints your id — Ctrl+C after):\n'
+                   f'          python "{hunter / "telegram_listener.py"}"',
                    read_key(h_env, "TELEGRAM_CHAT_ID"))
         if v:
             set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
@@ -293,7 +293,18 @@ def main() -> int:
 
     # 3) TASKFLOW CLOUD SYNC — write both the sync token (TaskFlow) and repo (Hunter, if present)
     section("3. TASKFLOW CLOUD SYNC  ·  optional (phone ↔ cloud)")
-    repo = prompt("Sync repo (owner/name)", "A PRIVATE GitHub repo, e.g. yourname/taskflow-sync", "")
+    repo = prompt("Sync repo",
+                  "Just  owner/name  (e.g. yourname/taskflow-sync). A full github.com URL is fine too — "
+                  "I'll trim it.", "")
+    if repo:
+        # Accept a pasted URL and reduce it to owner/name.
+        repo = repo.strip().rstrip("/")
+        for pfx in ("https://github.com/", "http://github.com/", "git@github.com:", "github.com/"):
+            if repo.lower().startswith(pfx):
+                repo = repo[len(pfx):]
+                break
+        if repo.endswith(".git"):
+            repo = repo[:-4]
     token = prompt("GitHub token (repo scope)", "https://github.com/settings/tokens/new  → check 'repo'", "")
     if token:
         set_key(TASKFLOW_DIR / ".env.sync", "TASKFLOW_SYNC_TOKEN", token)
@@ -326,6 +337,7 @@ def main() -> int:
     if hunter:
         print("      3. The Opportunity Hunter is linked — ask Nova's 'Scout' to find or run a hunt.")
     print("\n  Change or add any key later, any time:   python configure.py")
+    print("  Open Nova again after closing it:         run.bat   (Windows)  ·  bash run.sh")
     print("=" * 62 + "\n")
     return 0
 
