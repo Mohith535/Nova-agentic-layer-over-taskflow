@@ -184,6 +184,54 @@ def capture_telegram_chat_id(token: str, wait_seconds: int = 90) -> str | None:
     return None
 
 
+def send_ntfy_test(topic: str) -> bool:
+    """Push a real confirmation to the user's phone the moment ntfy is set up, so 'is it working?'
+    is answered instantly instead of waiting for the next hunt. Stdlib only."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            f"https://ntfy.sh/{topic}",
+            data="Opportunity Hunter alerts are live on this device. You'll get your daily picks here.".encode("utf-8"),
+            headers={"Title": "Nova setup ✓", "Tags": "rocket"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return 200 <= getattr(r, "status", 200) < 300
+    except Exception:
+        return False
+
+
+def send_telegram_test(token: str, chat_id: str) -> bool:
+    """Send a real confirmation message to the linked Telegram chat, so the user sees two-way
+    Telegram actually work on their phone right after linking. Stdlib only."""
+    import json as _json
+    import urllib.parse
+    import urllib.request
+    text = ("\U0001F680 <b>Nova × Opportunity Hunter</b>\n"
+            "Telegram is linked to this chat. Your top opportunities will land here — "
+            "and you'll be able to act on them with one tap.")
+    try:
+        data = urllib.parse.urlencode({"chat_id": chat_id, "text": text, "parse_mode": "HTML"}).encode()
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage",
+                                    data=data, timeout=15) as r:
+            return bool(_json.loads(r.read().decode("utf-8")).get("ok"))
+    except Exception:
+        return False
+
+
+def _write_nova_launch_descriptor() -> None:
+    """Leave a tiny descriptor in ~/.taskflow so the TaskFlow dashboard's 'Open Nova' button can
+    START Nova (a separate app) when it isn't already running — pointing at this venv's exact
+    interpreter, so it's robust across machines and works even for an isolated install."""
+    import json as _json
+    try:
+        TASKFLOW_DIR.mkdir(parents=True, exist_ok=True)
+        (TASKFLOW_DIR / "nova_launch.json").write_text(_json.dumps({
+            "cmd": [_venv_python(), "-m", "nova", "web"],
+            "url": "http://127.0.0.1:8765",
+        }), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def section(title: str) -> None:
     print("\n" + "─" * 60)
     print(f"  {title}")
@@ -429,6 +477,8 @@ def main() -> int:
         set_key(nova_env, "GEMINI_API_KEY", v)
         wrote.append("Nova .env — Gemini key")
         check_gemini(v)
+    # Let the TaskFlow dashboard start Nova on demand (Nova is installed by the time we're here).
+    _write_nova_launch_descriptor()
 
     # 2) TASKFLOW CLI — optional install (the board Nova reads)
     offer_taskflow(wrote)
@@ -449,6 +499,11 @@ def main() -> int:
                    read_key(h_env, "NTFY_TOPIC"))
         if v:
             set_key(h_env, "NTFY_TOPIC", v); wrote.append("Hunter .env — ntfy topic")
+            print("    Sending a test push to your phone…")
+            if send_ntfy_test(v):
+                print("    ✓ Sent — check the ntfy app (look for 'Nova setup ✓'). That confirms alerts work.")
+            else:
+                print("    (Couldn't send the test push right now — alerts will still fire during real hunts.)")
 
         v = prompt("Groq API key (sharper AI scoring)",
                    "Free, no card: console.groq.com -> API Keys -> Create -> copy",
@@ -477,17 +532,20 @@ def main() -> int:
             except KeyboardInterrupt:
                 cid = None
                 print("\n      Skipped.")
-            if cid:
-                set_key(h_env, "TELEGRAM_CHAT_ID", cid)
-                wrote.append("Hunter .env — Telegram chat id (auto-detected)")
-                print(f"      ✓ Linked — chat id {cid} saved. Two-way Telegram is ready.")
-            else:
+            if not cid:
                 print("      No message detected yet — no problem. Re-run  python configure.py")
                 print("      later, tap START in the bot, and it'll be picked up automatically.")
-                v = prompt("Or paste your Telegram chat id now (optional)",
-                           "the number the bot replies with after /start", "")
-                if v:
-                    set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
+                cid = prompt("Or paste your Telegram chat id now (optional)",
+                             "the number the bot replies with after /start", "")
+            if cid:
+                set_key(h_env, "TELEGRAM_CHAT_ID", cid)
+                wrote.append("Hunter .env — Telegram chat id")
+                print(f"      ✓ Linked — chat id {cid} saved.")
+                print("      Sending you a confirmation message on Telegram…")
+                if send_telegram_test(token, cid):
+                    print("      ✓ Sent — check your phone! Two-way Telegram is live.")
+                else:
+                    print("      (Couldn't send the confirmation right now — it'll still work in real hunts.)")
 
         # A confirmation run is only meaningful once there's a scoring key or a delivery
         # channel to exercise. With nothing configured, we say so plainly and skip it —
