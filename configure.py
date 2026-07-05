@@ -149,6 +149,41 @@ def check_gemini(key: str) -> None:
         print("    (Couldn't reach Google to verify right now — saved. Run `nova doctor` to re-check.)")
 
 
+def capture_telegram_chat_id(token: str, wait_seconds: int = 90) -> str | None:
+    """Detect the Telegram chat id automatically so the user never runs a separate script:
+    they just tap START in the bot and we read it off Telegram's getUpdates. Stdlib only
+    (urllib) — no dependency on 'requests'. Returns the chat id, or None on timeout/bad token."""
+    import json as _json
+    import time as _time
+    import urllib.error
+    import urllib.request
+    url = f"https://api.telegram.org/bot{token}/getUpdates?timeout=15"
+    deadline = _time.time() + wait_seconds
+    nudged = False
+    while _time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=20) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 404):          # bad/unknown bot token — no point retrying
+                print("    ⚠ Telegram rejected that bot token — it looks wrong. Skipping this step.")
+                return None
+            _time.sleep(2); continue
+        except Exception:
+            _time.sleep(2); continue          # transient network hiccup — keep waiting
+        # Telegram returns any messages sent to the bot in the last 24h — even a /start from a
+        # previous attempt gives the right (unchanging) chat id, so this is often instant.
+        for upd in reversed(data.get("result") or []):
+            msg = upd.get("message") or upd.get("edited_message") or {}
+            chat = msg.get("chat") or {}
+            if chat.get("id") is not None:
+                return str(chat["id"])
+        if not nudged:
+            print("    …listening — open your bot and tap START now.")
+            nudged = True
+    return None
+
+
 def section(title: str) -> None:
     print("\n" + "─" * 60)
     print(f"  {title}")
@@ -426,14 +461,33 @@ def main() -> int:
                    read_key(h_env, "TELEGRAM_BOT_TOKEN"))
         if v:
             set_key(h_env, "TELEGRAM_BOT_TOKEN", v); wrote.append("Hunter .env — Telegram token")
-        v = prompt("Telegram chat id",
-                   'Send /start to your bot, then paste-and-run this ONE line (it prints your\n'
-                   '      id — press Ctrl+C after it appears). Use the full path shown — it points at\n'
-                   "      Nova's environment, which has the Hunter's dependencies installed:\n"
-                   f'          "{_venv_python()}" "{hunter / "telegram_listener.py"}"',
-                   read_key(h_env, "TELEGRAM_CHAT_ID"))
-        if v:
-            set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
+
+        # Telegram chat id — FULLY AUTOMATIC. No script for the user to run: they just tap START
+        # in the bot and we read the chat id straight off Telegram. Manual paste only as a fallback.
+        token = read_key(h_env, "TELEGRAM_BOT_TOKEN")
+        if token and read_key(h_env, "TELEGRAM_CHAT_ID"):
+            print("\n  Telegram chat id — already linked, keeping it.")
+        elif token:
+            print("\n  Telegram chat id — automatic, nothing to run:")
+            print("      1. Open Telegram and find the bot you just created.")
+            print("      2. Tap  START  (or send it any message, like 'hi').")
+            print("      I'll detect your chat id right here — waiting up to 90 seconds…")
+            try:
+                cid = capture_telegram_chat_id(token)
+            except KeyboardInterrupt:
+                cid = None
+                print("\n      Skipped.")
+            if cid:
+                set_key(h_env, "TELEGRAM_CHAT_ID", cid)
+                wrote.append("Hunter .env — Telegram chat id (auto-detected)")
+                print(f"      ✓ Linked — chat id {cid} saved. Two-way Telegram is ready.")
+            else:
+                print("      No message detected yet — no problem. Re-run  python configure.py")
+                print("      later, tap START in the bot, and it'll be picked up automatically.")
+                v = prompt("Or paste your Telegram chat id now (optional)",
+                           "the number the bot replies with after /start", "")
+                if v:
+                    set_key(h_env, "TELEGRAM_CHAT_ID", v); wrote.append("Hunter .env — Telegram chat id")
 
         # A confirmation run is only meaningful once there's a scoring key or a delivery
         # channel to exercise. With nothing configured, we say so plainly and skip it —
