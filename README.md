@@ -89,12 +89,16 @@ python -m venv .venv && .venv\Scripts\activate      # Windows (mac/linux: source
 pip install -e .
 
 nova web          # visual console at http://127.0.0.1:8765 (auto-seeds demo data)
+nova doctor       # health check — verifies your key, data, and the Hunter (green/red)
 nova brief        # today's mission briefing from your data
 nova plan "prepare for the Microsoft Explore interview"
 nova coach        # behavioral patterns + one concrete next step
 nova ask "what's actually blocking me right now?"
 nova mcp --selftest   # works with no key — lists the 17 MCP tools
 ```
+
+Handy extras: `python configure.py` re-runs the key wizard any time · `reset.bat` /
+`bash reset.sh` wipes the install back to a clean state for re-testing.
 </details>
 
 No accounts. No telemetry. Your task data stays on your machine — only derived, consent-gated context ever reaches Gemini.

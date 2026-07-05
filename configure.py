@@ -94,9 +94,21 @@ def find_hunter() -> Path | None:
 
 # ── interactive prompt ──────────────────────────────────────────────────────
 
+def _mask(v: str) -> str:
+    """Show just enough of a saved value to recognise it, never enough to leak it."""
+    v = (v or "").strip()
+    return (v[:5] + "…" + v[-3:]) if len(v) > 10 else "•" * len(v)
+
+
 def prompt(label: str, where: str, current: str = "", required: bool = False) -> str | None:
-    """Ask for one value. Returns the new value, or None to leave unchanged/skip."""
-    status = "  (already set — Enter to keep)" if current else ("  (REQUIRED for live AI)" if required else "  (optional — Enter to skip)")
+    """Ask for one value. Returns the new value, or None to leave unchanged/skip.
+    When a value is already saved, show it masked so you know what's there without exposing it."""
+    if current:
+        status = f"  (current: {_mask(current)} — Enter to keep)"
+    elif required:
+        status = "  (REQUIRED for live AI)"
+    else:
+        status = "  (optional — Enter to skip)"
     print(f"\n  {label}{status}")
     print(f"    ↳ {where}")
     try:
@@ -105,6 +117,23 @@ def prompt(label: str, where: str, current: str = "", required: bool = False) ->
         print("\n  Skipped.")
         return None
     return val or None
+
+
+def check_gemini(key: str) -> None:
+    """Validate a freshly-entered Gemini key live — non-blocking: it always saves, and only
+    tells you whether the key actually works so a typo is caught now, not mid-demo."""
+    try:
+        from nova.config import validate_gemini_key
+    except Exception:
+        return  # nova not importable yet (shouldn't happen after install) — skip quietly
+    print("    Verifying the key…")
+    res = validate_gemini_key(key)
+    if res is True:
+        print("    ✓ Verified — the live AI agents are ready.")
+    elif res is False:
+        print("    ⚠ That key was rejected — it looks wrong. Saved anyway; re-run to fix it.")
+    else:
+        print("    (Couldn't reach Google to verify right now — saved. Run `nova doctor` to re-check.)")
 
 
 def section(title: str) -> None:
@@ -200,6 +229,7 @@ def main() -> int:
     if v:
         set_key(nova_env, "GEMINI_API_KEY", v)
         wrote.append("Nova .env — Gemini key")
+        check_gemini(v)
 
     # 2) OPPORTUNITY HUNTER — detect it, or OFFER to install it (optional & personal)
     hunter = find_hunter()

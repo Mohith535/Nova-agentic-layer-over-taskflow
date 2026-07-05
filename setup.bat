@@ -9,6 +9,16 @@ setlocal
 where python >nul 2>nul
 if errorlevel 1 (
   echo Python is not on PATH. Install Python 3.11+ from https://python.org and re-run.
+  echo (During install, tick "Add Python to PATH".)
+  exit /b 1
+)
+
+REM Nova needs Python 3.11+ — fail with a clear message instead of a cryptic pip error later.
+python -c "import sys; sys.exit(0 if sys.version_info[:2]>=(3,11) else 1)"
+if errorlevel 1 (
+  echo Nova needs Python 3.11 or newer. You currently have:
+  python --version
+  echo Please install Python 3.11+ from https://python.org, then re-run setup.bat.
   exit /b 1
 )
 

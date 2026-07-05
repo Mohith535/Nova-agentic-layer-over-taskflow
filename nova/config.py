@@ -94,6 +94,31 @@ def ensure_api_key() -> bool:
     return False
 
 
+def validate_gemini_key(key: str, timeout: float = 8.0):
+    """Fast liveness check for a Gemini key via a single REST call. Never raises. Returns:
+      True  — the key works (HTTP 200 from the models endpoint)
+      False — the key was explicitly rejected (HTTP 400 / 401 / 403 — invalid or unauthorized)
+      None  — couldn't tell (network, timeout, or a transient server error) — don't alarm
+    A plain GET to the public models endpoint is much faster than the SDK pager and gives
+    unambiguous status codes, so validation feels instant instead of a multi-second hang."""
+    if not key:
+        return False
+    try:
+        import requests
+        r = requests.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            params={"key": key, "pageSize": 1},
+            timeout=timeout,
+        )
+        if r.status_code == 200:
+            return True
+        if r.status_code in (400, 401, 403):
+            return False
+        return None
+    except Exception:
+        return None
+
+
 def data_dir() -> str | None:
     return os.environ.get("TASKFLOW_DATA_PATH")
 

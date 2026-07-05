@@ -44,6 +44,82 @@ def _run_once(agent, message: str) -> str:
     return "\n".join(chunks).strip()
 
 
+def _doctor() -> None:
+    """Green/red health report — the one command that answers 'is it set up right?'.
+    Read-only and key-free to run; verifies the Gemini key live if one is present."""
+    import json as _json
+    import os as _os
+    from pathlib import Path as _P
+
+    from . import __version__, config
+
+    OK, WARN, BAD, OFF = "✓", "!", "✗", "-"
+    rows: list[tuple[str, str, str]] = []
+
+    rows.append((OK, "Nova installed", f"v{__version__}"))
+
+    # Gemini key — present? and does it actually work?
+    if config.ensure_api_key():
+        print("  Verifying your Gemini key (a moment)…")
+        res = config.validate_gemini_key(_os.environ.get("GOOGLE_API_KEY", ""))
+        if res is True:
+            rows.append((OK, "Gemini API key", "verified — live AI is ON"))
+        elif res is False:
+            rows.append((BAD, "Gemini API key", "rejected — the key looks wrong. Fix: python configure.py"))
+        else:
+            rows.append((WARN, "Gemini API key", "set, but couldn't verify right now (network?) — try again"))
+    else:
+        rows.append((BAD, "Gemini API key", "missing — run: python configure.py  (or explore on demo data)"))
+
+    # TaskFlow data — report state, don't seed (that's a launch-time action)
+    explicit = _os.environ.get("TASKFLOW_DATA_PATH")
+    dd = _P(explicit).expanduser() if explicit else (_P.home() / ".taskflow")
+    tj = dd / "tasks.json"
+    try:
+        if tj.exists():
+            n = len(_json.loads(tj.read_text(encoding="utf-8")))
+            rows.append((OK, "TaskFlow data", f"ready — {n} tasks at {dd}"))
+        else:
+            rows.append((OFF, "TaskFlow data", f"will seed demo data on first launch ({dd})"))
+    except Exception as e:
+        rows.append((WARN, "TaskFlow data", f"couldn't read ({str(e)[:40]})"))
+
+    # Opportunity Hunter — optional
+    try:
+        from .mcp.hunter_bridge import HunterBridge
+        st = HunterBridge().status()
+        if st.get("connected"):
+            rows.append((OK, "Opportunity Hunter", f"connected — last run {st.get('last_run') or 'not yet'}"))
+        else:
+            rows.append((OFF, "Opportunity Hunter", "not installed (optional) — add via python configure.py"))
+    except Exception:
+        rows.append((OFF, "Opportunity Hunter", "not installed (optional)"))
+
+    # Cloud sync — optional
+    try:
+        from .mcp.tools import NovaTools
+        ss = NovaTools(config.data_dir()).get_sync_status()
+        if ss.get("enabled"):
+            rows.append((OK, "Cloud sync", f"on — {ss.get('repo')}"))
+        else:
+            rows.append((OFF, "Cloud sync", "not configured (optional)"))
+    except Exception:
+        rows.append((OFF, "Cloud sync", "not configured (optional)"))
+
+    print("\n  ✦  NOVA — HEALTH CHECK\n")
+    for mark, label, detail in rows:
+        print(f"   [{mark}] {label:<20} {detail}")
+    bad = sum(1 for m, _, _ in rows if m == BAD)
+    warn = sum(1 for m, _, _ in rows if m == WARN)
+    print()
+    if bad == 0 and warn == 0:
+        print("   All green — Nova is ready.\n")
+    elif bad == 0:
+        print("   Ready to go. Anything marked '-' is an optional extra.\n")
+    else:
+        print("   A couple of things need attention (see ✗). Fix them with:  python configure.py\n")
+
+
 def main(argv=None) -> None:
     import argparse
 
@@ -64,6 +140,7 @@ def main(argv=None) -> None:
     p_mcp.add_argument("--selftest", action="store_true", help="List MCP tools and exit.")
     p_web = sub.add_parser("web", help="Launch the Nova web console (localhost).")
     p_web.add_argument("--port", type=int, default=8765)
+    sub.add_parser("doctor", help="Health check — verify your key, data, and the Opportunity Hunter.")
     parser.add_argument("--fast", action="store_true",
                         help="Quota-frugal: one model call per turn (applies to brief/coach).")
 
@@ -77,6 +154,10 @@ def main(argv=None) -> None:
         from .mcp.server import main as mcp_main
 
         mcp_main(["--selftest"] if args.selftest else [])
+        return
+
+    if args.cmd == "doctor":
+        _doctor()
         return
 
     if args.cmd == "web":
