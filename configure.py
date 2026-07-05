@@ -75,6 +75,18 @@ def set_key(env_path: Path, key: str, value: str) -> None:
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _freshen_clone(target: Path) -> None:
+    """Best-effort `git pull` on an existing clone so a re-run picks up the latest code — quiet,
+    time-boxed, and never fatal (offline, shallow, or local edits just leave the copy as-is)."""
+    if not (shutil.which("git") and (target / ".git").exists()):
+        return
+    try:
+        subprocess.run(["git", "-C", str(target), "pull", "--ff-only"],
+                       capture_output=True, timeout=60)
+    except Exception:
+        pass
+
+
 def find_hunter() -> Path | None:
     """Locate the Opportunity Hunter: NOVA_HUNTER_ROOT env, then common sibling folders."""
     candidates: list[Path] = []
@@ -167,6 +179,7 @@ def offer_taskflow(wrote: list[str]) -> None:
     target = NOVA_DIR.parent / "taskflow"
     if target.exists() and (target / "pyproject.toml").exists():
         print(f"  Using existing folder: {target}")
+        _freshen_clone(target)
     else:
         print(f"  Cloning into {target} …")
         try:
@@ -211,6 +224,7 @@ def offer_hunter(wrote: list[str]) -> Path | None:
     target = NOVA_DIR.parent / "opportunity-hunter"
     if target.exists() and (target / "main.py").exists():
         print(f"  Using existing folder: {target}")
+        _freshen_clone(target)
     else:
         print(f"  Cloning into {target} …")
         try:
