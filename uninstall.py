@@ -18,7 +18,10 @@ from __future__ import annotations
 import os
 import shutil
 import socket
+import stat
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 NOVA_DIR = Path(__file__).resolve().parent
@@ -46,18 +49,62 @@ def _nova_running() -> bool:
 
 
 def _rm(p: Path) -> bool:
-    """Remove a file or folder. Returns True if something was actually removed."""
-    try:
-        if p.is_dir():
-            shutil.rmtree(p)
-        elif p.exists():
-            p.unlink()
-        else:
-            return False
-        return True
-    except Exception as e:
-        print(f"      ! Couldn't remove {p}\n        ({e})")
+    """Remove a file or folder. Returns True once it's actually gone.
+
+    Crucially, this clears the read-only bit first: git clones (opportunity-hunter, taskflow)
+    leave read-only files under .git, and on Windows a normal delete REFUSES those — which is
+    exactly why an uninstall could 'do nothing' and leave the folders behind. We make everything
+    writable, then delete. Works the same on Windows, macOS and Linux."""
+    if not p.exists() and not p.is_symlink():
         return False
+    try:
+        if p.is_dir() and not p.is_symlink():
+            for root, dirs, files in os.walk(p):
+                for name in dirs + files:
+                    try:
+                        os.chmod(os.path.join(root, name), stat.S_IWRITE)
+                    except OSError:
+                        pass
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            try:
+                p.unlink()
+            except PermissionError:
+                os.chmod(p, stat.S_IWRITE)
+                p.unlink()
+        return not p.exists()
+    except Exception as e:
+        print(f"      ! Couldn't fully remove {p}\n        ({e})")
+        return not p.exists()
+
+
+def _schedule_self_delete(folder: Path) -> None:
+    """Delete the Nova SOURCE folder too — the one thing a running program can't remove itself.
+    We hand it to a tiny detached helper that waits a moment for this process to exit, then
+    deletes the folder and itself. Cross-platform (a .bat on Windows, a shell script elsewhere)."""
+    try:
+        if os.name == "nt":
+            script = Path(tempfile.gettempdir()) / "nova_cleanup.bat"
+            # ping = a portable ~3s sleep; rmdir /s /q force-removes read-only git files too.
+            script.write_text(
+                "@echo off\r\n"
+                "ping 127.0.0.1 -n 4 >nul\r\n"
+                f'rmdir /s /q "{folder}"\r\n'
+                'del "%~f0" >nul 2>&1\r\n',
+                encoding="utf-8")
+            subprocess.Popen(["cmd", "/c", str(script)],
+                             creationflags=0x00000008 | 0x08000000,  # DETACHED_PROCESS | CREATE_NO_WINDOW
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            script = Path(tempfile.gettempdir()) / "nova_cleanup.sh"
+            script.write_text(f'#!/bin/sh\nsleep 3\nrm -rf "{folder}"\nrm -f "$0"\n', encoding="utf-8")
+            script.chmod(0o755)
+            subprocess.Popen(["/bin/sh", str(script)], start_new_session=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"      ✓ The Nova folder will be removed a few seconds after this window closes:\n"
+              f"        {folder}")
+    except Exception as e:
+        print(f"      · Couldn't auto-remove the Nova folder ({e}). Delete it by hand:\n        {folder}")
 
 
 # ── removal actions ─────────────────────────────────────────────────────────
@@ -249,9 +296,7 @@ def main() -> int:
     print("   ✦  DONE")
     print("=" * 62)
     if "nova" in plan:
-        print(f"\n  The Nova source folder is still here:\n      {NOVA_DIR}")
-        print("  Delete that folder by hand to finish removing Nova completely (an app can't")
-        print("  delete the folder it's running from).")
+        _schedule_self_delete(NOVA_DIR)
     if not delete_data and (plan & {"nova", "hunter", "taskflow"}):
         print(f"\n  Your data was kept at  {TASKFLOW_DIR}  — reinstalling later picks up right")
         print("  where you left off.")

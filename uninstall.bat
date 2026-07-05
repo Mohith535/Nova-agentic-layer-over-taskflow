@@ -12,6 +12,8 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+REM Step OUT of the Nova folder first, so it can be fully removed if you uninstall Nova.
+cd /d "%~dp0.." 2>nul
 python "%~dp0uninstall.py"
 echo.
 pause
