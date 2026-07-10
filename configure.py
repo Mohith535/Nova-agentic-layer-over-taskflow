@@ -217,6 +217,32 @@ def send_telegram_test(token: str, chat_id: str) -> bool:
         return False
 
 
+def _enable_taskflow_cloud_sync(repo: str) -> bool:
+    """Actually switch TaskFlow's cloud sync ON.
+
+    TaskFlow reads its sync settings from ~/.taskflow/config.json — NOT from any .env. Writing
+    only the token (and the repo into the Hunter's .env) leaves `taskflow sync push` refusing
+    with "Cloud sync not enabled", even though this wizard just reported everything saved.
+    We merge the two keys `taskflow sync setup` would have written, preserving the rest."""
+    import json as _json
+    cfg_path = TASKFLOW_DIR / "config.json"
+    try:
+        TASKFLOW_DIR.mkdir(parents=True, exist_ok=True)
+        cfg = {}
+        if cfg_path.exists():
+            try:
+                cfg = _json.loads(cfg_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                cfg = {}          # unreadable config: start clean rather than crash the wizard
+        cfg["cloud_sync_enabled"] = True
+        cfg["sync_repo"] = repo
+        cfg_path.write_text(_json.dumps(cfg, indent=2), encoding="utf-8")
+        return True
+    except Exception as e:
+        print(f"    ! Couldn't enable TaskFlow cloud sync ({e}).  Run:  taskflow sync setup")
+        return False
+
+
 def _write_nova_launch_descriptor() -> None:
     """Leave a tiny descriptor in ~/.taskflow so the TaskFlow dashboard's 'Open Nova' button can
     START Nova (a separate app) when it isn't already running — pointing at this venv's exact
@@ -597,6 +623,11 @@ def main() -> int:
     if repo and hunter:
         set_key(hunter / ".env", "TASKFLOW_SYNC_REPO", repo)
         wrote.append("Hunter .env — sync repo")
+    # The token alone does nothing: TaskFlow only syncs when config.json says so. Flip it here,
+    # otherwise the wizard reports success while `taskflow sync push` stays disabled.
+    if repo and token and _enable_taskflow_cloud_sync(repo):
+        wrote.append("TaskFlow config.json — cloud sync ENABLED")
+        print("\n    ✓ TaskFlow cloud sync is enabled. Verify with:  taskflow sync push")
 
     # 5) HOW TO RUN — isolated (evaluator-safe, zero footprint) vs system-wide (daily use)
     went_global = offer_global_commands()
