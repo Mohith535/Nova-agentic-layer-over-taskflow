@@ -147,6 +147,12 @@ class TaskFlowWriter:
                 if int(t.get("id", -1)) == task_id:
                     if t.get("dropped_at"):
                         return True
+                    # `status` as well as the timestamp. TaskFlow's CLI drop writes both, and any
+                    # reader keying off `status` alone would otherwise go on treating this as live
+                    # work — the same divergence that made dashboard-closed tasks immortal in Nova.
+                    # It also makes the edit_history entry below, which records status -> dropped,
+                    # true rather than a claim about a change that never happened.
+                    t["status"] = "dropped"
                     t["dropped_at"] = _now_iso()
                     t["drop_reason"] = reason or "dropped via Nova"
                     t["last_decision"] = "dropped"
