@@ -60,6 +60,12 @@ class NovaTask(BaseModel):
     postpone_count: int = 0
     created_at: Optional[str] = None
     completed_at: Optional[str] = None
+    # TaskFlow records a soft-close as a TIMESTAMP, and treats those as authoritative everywhere
+    # (`not t.completed and not t.dropped_at and not t.offloaded_at`). Nova was reading only
+    # `status`, so a task closed from the dashboard — which sets the timestamp — stayed "live" here
+    # forever. Carry both, and trust whichever fires.
+    dropped_at: Optional[str] = None
+    offloaded_at: Optional[str] = None
     notes: Optional[str] = None
     # Computed (single source: mirrors server._computed_task_fields)
     is_overdue: bool = False
@@ -87,6 +93,8 @@ class NovaTask(BaseModel):
             postpone_count=int(d.get("postpone_count") or 0),
             created_at=d.get("created_at"),
             completed_at=d.get("completed_at"),
+            dropped_at=d.get("dropped_at"),
+            offloaded_at=d.get("offloaded_at"),
             notes=d.get("description"),  # TaskFlow stores notes as `description`
             is_overdue=_is_overdue(deadline, completed),
             duration_minutes=duration_to_minutes(duration),
@@ -95,8 +103,23 @@ class NovaTask(BaseModel):
 
     @property
     def is_active(self) -> bool:
-        """Not completed, dropped, or offloaded — i.e. still 'live' work."""
-        return not self.completed and self.status not in ("dropped", "offloaded")
+        """Not completed, dropped, or offloaded — i.e. still 'live' work.
+
+        Checks the TIMESTAMPS as well as `status`, because TaskFlow does not always write both and
+        its own filters key off the timestamps. Closing a task from the dashboard set `dropped_at` /
+        `offloaded_at` and left `status` untouched, so TaskFlow hid the task while Nova went on
+        coaching the user about work they had already let go of — a silent disagreement between two
+        systems that each looked correct in isolation.
+
+        This also repairs data already written that way: a task carrying a timestamp but no status
+        is now correctly read as closed, with no migration.
+        """
+        return (
+            not self.completed
+            and self.status not in ("dropped", "offloaded")
+            and not self.dropped_at
+            and not self.offloaded_at
+        )
 
 
 class EditEvent(BaseModel):
