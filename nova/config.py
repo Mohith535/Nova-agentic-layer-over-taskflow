@@ -9,11 +9,23 @@ Model routing strategy
 Nova uses different model tiers based on task complexity and tracks quota exhaustion
 in-memory so it never retries a dead model in the same session:
 
-  COMPLEX  (plan, coach)  → most capable available: 2.5-flash → 2.0-flash
-  SIMPLE   (ask, brief)   → cheapest available first: 2.0-flash-lite → 2.0-flash → 2.5-flash
+  COMPLEX  (plan, coach)  → most capable available, then cheaper fallbacks
+  SIMPLE   (ask, brief)   → cheapest available first
 
-Quota resets at midnight Pacific every day. On 429, the model is marked exhausted for
-the session and the router automatically falls back to the next available tier.
+The free tier meters **per model per day** (the quota id is literally
+``GenerateRequestsPerDayPerProjectPerModel-FreeTier``), so a chain of N live models is
+N separate daily allowances. That makes the chain the whole quota strategy — which is
+why it must not contain dead models.
+
+2026-09-14: it did. The chain was ``2.5-flash → 2.0-flash`` and both 2.0 models had been
+RETIRED (404: "no longer available"), so once 2.5-flash hit its 20/day cap there was
+nothing live to fall back to and every agent call failed. Verified against the live
+models.list() endpoint, not assumed.
+
+Exhaustion is persisted to disk, not just held in memory: each CLI/bridge call is a fresh
+process, so an in-memory set was always empty at startup and the router retried the dead
+model first, every single time. Quota resets at midnight Pacific, so the file is keyed by
+the Pacific date and self-expires.
 """
 
 from __future__ import annotations
@@ -31,11 +43,66 @@ except Exception:
 
 # Models in preference order for each tier.
 # Override any with env vars; router skips exhausted ones automatically.
-_COMPLEX_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]   # plan, coach
-_SIMPLE_MODELS  = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]  # ask, brief
+# Verified live 2026-09-14 against models.list(); each entry is a SEPARATE daily quota.
+# Ordered most-capable-first for complex work, cheapest-first for simple work. The `-latest`
+# aliases sit at the end of each chain as a self-updating backstop: when these pinned names
+# are retired in turn, the alias keeps Nova answering instead of 404-ing.
+_COMPLEX_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash",
+                   "gemini-3.5-flash-lite", "gemini-flash-latest"]
+_SIMPLE_MODELS  = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.6-flash",
+                   "gemini-flash-lite-latest"]
 
-_exhausted: set[str] = set()   # quota-dead this session
+_exhausted: set[str] = set()   # quota-dead today (loaded from disk on first use)
 _lock = threading.Lock()
+_loaded = False
+
+
+def _pacific_day() -> str:
+    """Gemini's free quota resets at midnight Pacific, so that is the key the file is
+    stamped with. Computed as a fixed UTC-8 offset rather than via a tz database: being an
+    hour out during DST just expires the record an hour early, which costs one wasted retry
+    and never wrongly suppresses a model."""
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(hours=8)).strftime("%Y-%m-%d")
+
+
+def _state_file():
+    from pathlib import Path
+    return Path(os.environ.get("TASKFLOW_DATA_PATH") or (Path.home() / ".taskflow")) / "nova_quota.json"
+
+
+def _load_exhausted() -> None:
+    """Read today's exhausted models from disk, once per process.
+
+    Every `nova ask|plan|coach` and every EDI bridge call is a FRESH PROCESS. An in-memory
+    set is therefore always empty at startup, so the router kept picking the model it had
+    already learned was dead - relearning it, at the cost of a real failed call, every time.
+    Failure here is always silent-and-safe: a missing or corrupt file just means "nothing
+    known exhausted", which costs one retry, never a wrong refusal."""
+    global _loaded
+    if _loaded:
+        return
+    _loaded = True
+    try:
+        import json
+        d = json.loads(_state_file().read_text(encoding="utf-8"))
+        if d.get("day") == _pacific_day():
+            _exhausted.update(d.get("models", []))
+    except Exception:
+        pass
+
+
+def _save_exhausted() -> None:
+    try:
+        import json
+        f = _state_file()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"day": _pacific_day(), "models": sorted(_exhausted)}),
+                       encoding="utf-8")
+        tmp.replace(f)      # atomic, same pattern TaskFlow uses for tasks.json
+    except Exception:
+        pass
 
 
 def _env_override(env_key: str, fallbacks: list[str]) -> list[str]:
@@ -56,6 +123,7 @@ def best_model(mode: str) -> str:
         else _env_override("NOVA_FAST_MODEL", _SIMPLE_MODELS)
     )
     with _lock:
+        _load_exhausted()
         for m in candidates:
             if m not in _exhausted:
                 return m
@@ -65,12 +133,15 @@ def best_model(mode: str) -> str:
 def mark_exhausted(model: str) -> None:
     """Call this when a 429/RESOURCE_EXHAUSTED is received for a model."""
     with _lock:
+        _load_exhausted()
         _exhausted.add(model)
+        _save_exhausted()
 
 
 def exhausted_models() -> list[str]:
     """Current list of quota-dead models (for UI display / debugging)."""
     with _lock:
+        _load_exhausted()
         return sorted(_exhausted)
 
 
