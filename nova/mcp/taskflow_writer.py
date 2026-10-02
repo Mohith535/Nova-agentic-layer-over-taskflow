@@ -164,6 +164,35 @@ class TaskFlowWriter:
                     return True
             return False
 
+    def restore_task(self, task_id: int, reason: str) -> bool:
+        """Undo a drop or a completion — put the task back on the active board.
+
+        Asked for from EDI on 2026-10-02 ("can you bring it up, I didn't ask it yet, can you undo
+        it?"), after a voice-typed "do it" was read as "its done". Nothing is erased in either
+        direction: the drop or the completion stays in edit_history (append-only), and this adds
+        the restore beside it — so the Coach sees "dropped, then brought back", which is the true
+        story, not a record that pretends the drop never happened."""
+        with _WRITE_LOCK:
+            tasks = self.reader._raw_tasks()
+            for t in tasks:
+                if int(t.get("id", -1)) == task_id:
+                    was = t.get("status") or ("completed" if t.get("completed")
+                                              else "dropped" if t.get("dropped_at") else "todo")
+                    if not t.get("completed") and not t.get("dropped_at") and was not in ("dropped", "completed"):
+                        return True                     # already live: nothing to undo
+                    t["completed"] = False
+                    t["dropped_at"] = None
+                    t["drop_reason"] = None
+                    t["status"] = "todo"
+                    t["last_decision"] = "restored"
+                    t["last_decision_at"] = _now_iso()
+                    t.setdefault("edit_history", []).append(
+                        _edit("status", was, "todo", reason or "restored via EDI")
+                    )
+                    self._atomic_save(tasks)
+                    return True
+            return False
+
     def set_prime_target(self, task_id: int) -> bool:
         """Set today's single Prime Target via TaskFlow's timeline mapping
         (``{task_id: "YYYY-MM-DD_prime"}``), enforcing one-per-day."""
