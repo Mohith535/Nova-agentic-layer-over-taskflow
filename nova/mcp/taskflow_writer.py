@@ -193,6 +193,29 @@ class TaskFlowWriter:
                     return True
             return False
 
+    def retitle_task(self, task_id: int, title: str, reason: str) -> bool:
+        """Correct a task's title. The old title stays recoverable: TaskFlow logs title edits
+        to edit_history (append-only) when the behavioural-data toggle is on, and so does this.
+
+        From EDI on 2026-10-03: "remind me to call to this club to discuss Instinct AI" was his
+        voice typer's "Claude", and nothing could ever correct the board's misheard title."""
+        title = " ".join(str(title or "").split())[:200]
+        if not title:
+            return False
+        with _WRITE_LOCK:
+            tasks = self.reader._raw_tasks()
+            for t in tasks:
+                if int(t.get("id", -1)) == task_id:
+                    if t.get("title") == title:
+                        return True                     # already right: nothing to log
+                    if self.reader.nova_data_enabled():
+                        t.setdefault("edit_history", []).append(
+                            _edit("title", t.get("title"), title, reason or "retitled via EDI"))
+                    t["title"] = title
+                    self._atomic_save(tasks)
+                    return True
+            return False
+
     def set_prime_target(self, task_id: int) -> bool:
         """Set today's single Prime Target via TaskFlow's timeline mapping
         (``{task_id: "YYYY-MM-DD_prime"}``), enforcing one-per-day."""
